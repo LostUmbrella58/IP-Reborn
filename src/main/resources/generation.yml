@@ -1,0 +1,86 @@
+# -= Parkour generation settings =-
+# Settings for parkour generation
+generation:
+
+  # -= Jump type =-
+  # The chance of each type of jump. Can be above 100%.
+  type:
+    normal: 85
+    special: 10
+    schematic: 5
+
+  # -= Normal jump chances =-
+  normal:
+    # -= Distance chances =-
+    # The chances of the different distances in %. Can be above 100%.
+    distance:
+      1: 10
+      2: 55
+      3: 34
+      4: 1
+
+    # -= Height chances =-
+    # The chances of the different heights a jump can have in %. Can be above 100%.
+    height:
+      1: 20
+      0: 65
+      -1: 10
+      -2: 5
+
+  # -= Special jump chances =-
+  special:
+    ice: 50
+    slab: 30
+    pane: 10
+    fence: 10
+
+  # -= Jump settings =-
+  settings:
+
+    # -= Min jump y value =-
+    # The minimal y value for parkour to be generated at.
+    # If you are using a custom world, you should set this to a value where the parkour won't intersect with the world.
+    min-y: 100
+
+    # -= Max jump y value =-
+    # The maximum y value for parkour to be generated at.
+    # If you are using a custom world, you should set this to a value where the parkour won't intersect with the world.
+    max-y: 200
+
+# -= Advanced settings =-
+# Don't modify these if you don't know what you're doing!
+advanced:
+
+  # -= Spawn island options =-
+  # Options for the spawn island
+  island:
+    spawn:
+
+      # -= Player block =-
+      # The material of the block that the player will spawn on.
+      # This block will be set to air once the schematic has been pasted.
+      player-block: diamond_block
+
+      # -= Spawn yaw/pitch =-
+      yaw: -90
+      pitch: 0
+
+    parkour:
+
+      # -= Begin block =-
+      # The block from which the parkour begins
+      # This block will be set to air once the schematic has been pasted
+      begin-block: emerald_block
+
+      # -= Directional heading =-
+      # The directional heading of the parkour
+      # Possible options: north, south, west and east.
+      heading: east
+
+  # -= Border size =-
+  # The diameter of the playing area of a person in the single mode.
+  border-size: 10000
+
+  # -= Schematic cooldown =-
+  # The amount of blocks that provide a cooldown for the schematics.
+  schematic-cooldown: 20

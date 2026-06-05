@@ -1,0 +1,352 @@
+#===============================================================================#
+#                                                                               #
+#                                   88  88888888ba                              #
+#                                   88  88      "8b                             #
+#                                   88  88      ,8P                             #
+#                                   88  88aaaaaa8P'                             #
+#                                   88  88""""""'                               #
+#                                   88  88                                      #
+#                                   88  88                                      #
+#                                   88  88                                      #
+#                                                                               #
+#===============================================================================#
+
+#===============================================================================#
+#                                                                               #
+#                           (c) Efnilite 2020-2024                              #
+#                                                                               #
+#===============================================================================#
+
+# -= Debugging =-
+debug: false
+
+# -= Enable joining =-
+# Whether players can join the parkour.
+# When joining is disabled, the IP instance on this server will only read data from leaderboard databases.
+# Set joining to false if you want to create a cross-server leaderboard on this server.
+# true = players can join, false = players can't join.
+joining: true
+
+# -= Proxy options =-
+# Change the proxy settings. Applies to Velocity as well.
+# This also applies to servers who only want to run this plugin.
+bungeecord:
+
+  # -= Proxy enabled =-
+  # Enabling this will make players who join the server automatically join the parkour.
+  # You can enable this even without BungeeCord to make this a parkour-only server.
+  # True = players will automatically join the parkour on join, false = players have to use the menu/parkour command.
+  enabled: false
+
+  # -= Proxy return server =-
+  # The server the players will be returned to after they leave.
+  return_server: 'Lobby'
+
+  # -= Go back enabled =-
+  # Whether players should be teleported to a specific location after leaving.
+  # True = players get teleported to a specific location when they leave, false = they go to their location when they joined.
+  go-back-enabled: false
+
+  # -= Go back location =-
+  # The place players will go back to when they leave
+  # Only applies if proxy mode is disabled and the go-back-enabled option is true.
+  # Syntax: '(x,y,z,worldName)'
+  go-back: '(0,100,0,world)'
+
+  # -= Go back axes =-
+  # Sets the pitch and yaw of the go-back location.
+  # The first argument is the pitch, second yaw.
+  go-back-axes: '0,0'
+
+# -= Storage update interval =-
+# The amount of seconds between every disk/database storage update.
+# In this update, the in-memory scores will be written to storage.
+# A lower number might reduce the chance of losing data on server crashes,
+# but will increase the amount of requests to the disk/database.
+# (requires a restart, default = 300)
+storage-update-interval: 300
+
+# -= MySQL =-
+# The options for using MySQL as storage.
+sql:
+
+  # -= MySQL enabled =-
+  # Using databases makes you able to sync player data across multiple servers.
+  # True = data will be stored in a database, false = data will be stored locally.
+  enabled: false
+
+  # -= MySQL settings =-
+  url: 'localhost'
+  port: 3306
+  username: 'efnilite'
+  password: 'super secret password'
+  database: 'ip'
+
+  # -= MySQL prefix =-
+  # The prefix given to any table names
+  # The default is ''. Example: 'ip-' -> this would make the table 'ip-players'
+  prefix: ''
+
+# -= World options =-
+world:
+
+  # -= World name =-
+  # The world in which parkour will take place
+  name: 'witp'
+
+  # -= Delete world on reload =-
+  # Deletes the world on reload/restart of the server.
+  # This makes sure there are no ghost blocks left when a server crash occurs.
+  # Disable this if you want to have a custom map.
+  delete-on-reload: true
+
+  # -= World fall back =-
+  # The world players will be teleported to if they accidentally join the Parkour world without joining parkour
+  fall-back: 'world'
+
+# -= General options =-
+options:
+
+  # -= Leads options =-
+  leads:
+
+    # -= Leads amounts =-
+    # The lead amounts a player can select in their options menu.
+    # Values also need to be above 1 and below 64.
+    amount:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+
+  # -= Time options =-
+  time:
+
+    # -= Time format =-
+    # Choose between:
+    # 24 - 24 hour clock. (00:00, 12:00, 23:59)
+    # 12 - 12 hour clock. (12:00 AM, 12:00 PM, 11:59 PM)
+    format: 24
+
+    # -= Score time format =-
+    # H = hours, m = minutes, s = seconds, S = milliseconds
+    score-format: "mm:ss:SSS"
+
+  # -= Inventory handling =-
+  # Toggles the inventory handling system.
+  # True = players' inventories get saved and cleared when they join the parkour and when they leave they get their items back
+  # False = players keep their inventories when they join the parkour
+  inventory-handling: true
+
+  # -= Inventory saving =-
+  # Logs inventories of the players that join to the inventories/ folder.
+  # It is highly recommended to keep this enabled. Server crashes or errors while leaving might cause
+  # inventories of players to be lost if this is set to false!
+  # Use /ip recoverinventory to recover inventories of players who joined the parkour and who lost their inventories in a crash, etc.
+  inventory-saving: true
+
+  # -= Alternate inventory saving command =-
+  # If you don't trust this plugin to save inventories, you can select another plugin to execute a command
+  # to save players' inventories.
+  # Example: /inventory save %player%
+  # This command will be executed by console.
+  alt-inventory-saving-command: ''
+
+  # -= Disables inventory blocks =-
+  # Disables the ability for a player to open blocks with an inventory.
+  disable-inventory-blocks: false
+
+# -= Permissions options =-
+# These permissions are used to determine which things the player can change.
+# Find them at https://efnilite.dev/projects/ip/wiki
+permissions:
+
+  # -= Permissions enabled =-
+  # If permission handling is enabled.
+  # True = players need a permission to join, view the leaderboard, etc., false = players can do and view anything
+  # from this plugin besides admin commands.
+  enabled: false
+
+  # -= Per style permissions =-
+  # Gives every style a permission. The permission is the name of the style.
+  # Syntax: ip.settings.styles.<style> - example: ip.settings.styles.red
+  # Useful for servers with ranks.
+  per-style: false
+
+# -= Focus mode options =-
+focus-mode:
+
+  # -= Focus mode enabled =-
+  # If focus mode is enabled players can't use commands while in parkour.
+  # Note: this might not work on all commands because Minecraft.
+  enabled: false
+
+  # -=
+  # A whitelist for commands which ARE allowed during focus mode (if focus mode is enabled).
+  # If you want to disable the default whitelisted commands you can remove every item in the list below.
+  whitelist:
+    - 'ip'
+    - 'parkour'
+    - 'msg'
+    - 'r'
+    - 'w'
+    - 'whisper'
+    - 'reply'
+    - 'message'
+
+# -= Styles options =-
+styles:
+
+  # -= Styles list =-
+  # The list of all available styles, which you can add to if you want.
+  # For changes, you have to restart or reload your server.
+  list:
+    red: [red_wool, red_stained_glass, red_concrete, red_terracotta]
+    blue: [blue_wool, blue_stained_glass, blue_concrete, blue_terracotta]
+    light blue: [light_blue_wool, light_blue_stained_glass, light_blue_concrete, light_blue_terracotta]
+    green: [green_wool, green_stained_glass, green_concrete, green_terracotta]
+    lime: [lime_wool, lime_stained_glass, lime_concrete, lime_terracotta]
+    cyan: [cyan_wool, cyan_stained_glass, cyan_concrete, cyan_terracotta]
+    purple: [purple_wool, purple_stained_glass, purple_concrete, purple_terracotta]
+    yellow: [yellow_wool, yellow_stained_glass, yellow_concrete, yellow_terracotta]
+    gray: [gray_wool, gray_stained_glass, gray_concrete, gray_terracotta]
+    end: [end_stone, end_stone_bricks, purpur_block, purpur_pillar]
+    nether: [netherrack, nether_bricks, red_nether_bricks, chiseled_nether_bricks, nether_wart_block, nether_gold_ore, netherite_block, basalt]
+    quartz: [smooth_quartz, chiseled_quartz_block, quartz_block, quartz_bricks, quartz_pillar]
+    ocean: [prismarine, prismarine_bricks, dark_prismarine, sea_lantern]
+    redstone: [observer, dispenser, redstone_block, piston, sticky_piston, redstone_lamp, target]
+    overworld: [grass_block, stone, cobblestone, oak_log]
+    ores: [diamond_ore, gold_ore, iron_ore, coal_ore, nether_gold_ore, lapis_ore, redstone_ore, emerald_ore, nether_quartz_ore]
+    wood: [oak_planks, spruce_planks, jungle_planks, acacia_planks, birch_planks, dark_oak_planks, oak_log, spruce_log, jungle_log, birch_log, acacia_log, dark_oak_log]
+    rainbow: [red_wool, blue_wool, orange_wool, magenta_wool, lime_wool, purple_wool, yellow_concrete, orange_concrete, lime_concrete, light_blue_concrete, yellow_stained_glass, white_stained_glass, magenta_stained_glass, light_blue_stained_glass]
+    glow: [glowstone, jack_o_lantern, beacon, sea_lantern, crying_obsidian, shroomlight]
+
+# -= Scoring options =-
+scoring:
+
+  # -= All points =-
+  # This will give the player all possible points.
+  # If a player skips a block jump, it will still give the points for that block.
+  all-points: false
+
+  # -= Rewards use total score =-
+  # Whether interval rewards should use the total score of a session or not.
+  # The total score doesn't reset when a player falls.
+  rewards-use-total-score: false
+
+# -= Particle options =-
+particles:
+
+  # -= Particle shape =-
+  # The shape of the particle that will appear when a new block generates.
+  # Possible options: dot, box, circle
+  particle-shape: 'box'
+
+  # -= Particle type =-
+  # The type of particle that will appear when a new block generates.
+  # You can find all types at https://hub.spigotmc.org/javadocs/spigot/org/bukkit/Particle.html
+  particle-type: 'SPELL_INSTANT'
+
+  # -= Sound type =-
+  # The sound that will play when a new block generates.
+  # You can find all sounds at https://hub.spigotmc.org/javadocs/spigot/org/bukkit/Sound.html
+  sound-type: 'BLOCK_NOTE_BLOCK_GUITAR'
+
+  # -= Sound pitch =-
+  # The pitch of the sound that will play when a new block generates.
+  sound-pitch: 3
+
+  # -= Sound volume =-
+  sound-volume: 2
+
+# -= Default values =-
+# This is a list of all options and defaults.
+default-values:
+  main:
+    enabled: true
+
+  quit:
+    enabled: true
+
+  play:
+    enabled: true
+
+    single:
+      enabled: true
+
+    spectator:
+      enabled: true
+
+  community:
+    enabled: true
+
+    leaderboards:
+      enabled: true
+
+  settings:
+    enabled: true
+
+    lang:
+      enabled: true
+      default: "en"
+
+    chat:
+      enabled: true
+
+    parkour_settings:
+
+      item:
+        enabled: true
+
+      items:
+
+        styles:
+          enabled: true
+          default: "red"
+
+        leads:
+          enabled: true
+          default: 4
+
+        time:
+          enabled: true
+          default: 6000
+
+        schematics:
+          enabled: true
+          default: 0.6
+
+        scoreboard:
+          enabled: true
+          default: true
+
+        fall_message:
+          enabled: true
+          default: true
+
+        particles:
+          enabled: true
+          default: true
+
+        sound:
+          enabled: true
+          default: true
+
+        special_blocks:
+          enabled: true
+          default: true
+
+  lobby:
+    enabled: true
+
+    visibility:
+      enabled: true
+
+    player_management:
+      enabled: true

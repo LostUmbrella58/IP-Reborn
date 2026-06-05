@@ -1,0 +1,12 @@
+name: 'IP'
+description: '无尽跑酷(originally made by Efnilite)'
+author: Creeper_可能c (aka. Maybe__c), Efnilite
+version: 5.4
+api-version: 1.21.11
+main: dev.efnilite.ip.IP
+softdepend: [floodgate, Vault, PlaceholderAPI, Multiverse-Core, VoidGen]
+commands:
+    witp:
+        aliases: [parkour, ip]
+        usage: /<command> [arguments]
+        description: Main command for Infinite Parkour
