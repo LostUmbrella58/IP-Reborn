@@ -2,6 +2,8 @@
 
 Version 6 uses one plugin jar. Do not run old IPPlus or IEP jars beside it.
 
+To upgrade from Infinite Parkour Reborn 6.0.0 to 6.0.1, stop the server, replace the plugin jar, and keep `plugins/IP/`. Use Java 25 or newer when running Paper 26.3. The data locations and legacy migration procedure remain the same.
+
 ## Before upgrading
 
 1. Stop the server.

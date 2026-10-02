@@ -2,6 +2,8 @@
 
 版本 6 只使用一个插件 jar。不要让旧 IPPlus 或 IEP jar 与它同时运行。
 
+从 Infinite Parkour Reborn 6.0.0 升级到 6.0.1 时，关闭服务器、替换插件 jar，并保留 `plugins/IP/`。运行 Paper 26.3 需要 Java 25 或更高版本。数据目录与旧插件迁移流程保持不变。
+
 ## 升级前
 
 1. 关闭服务器。

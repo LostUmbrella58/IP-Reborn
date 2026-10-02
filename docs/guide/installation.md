@@ -9,6 +9,9 @@ Use one of these combinations:
 | 1.21.11 | Java 21+ |
 | 26.1.2 | Java 25+ |
 | 26.2 | Java 25+ |
+| 26.3 | Java 25+ |
+
+Paper 26.3 support was added in Infinite Parkour Reborn 6.0.1.
 
 The plugin does not require `vilib`, PaperLib, VoidGen, or a separate void-world generator.
 

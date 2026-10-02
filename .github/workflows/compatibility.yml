@@ -20,6 +20,9 @@ jobs:
           - label: Paper 26.2
             java: '25'
             paper: 26.2.build.84-stable
+          - label: Paper 26.3
+            java: '25'
+            paper: 26.3.build.142-beta
 
     name: ${{ matrix.label }} / Java ${{ matrix.java }}
     steps:

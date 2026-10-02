@@ -22,3 +22,8 @@ and worlds have been verified.
 
 The main IP data remains in `plugins/IP/`. `/ipp` and `/iep` are retained so
 existing staff procedures do not need to change immediately.
+
+To upgrade from Infinite Parkour Reborn 6.0.0 to 6.0.1, stop the server, replace
+the plugin jar, and keep the existing `plugins/IP/` directory. Use Java 25 or
+newer when running Paper 26.3. The data locations and legacy migration procedure
+remain the same.
