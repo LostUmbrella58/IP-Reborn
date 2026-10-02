@@ -37,5 +37,6 @@ features:
 | Paper 1.21.11 | 21 or newer |
 | Paper 26.1.2 | 25 or newer |
 | Paper 26.2 | 25 or newer |
+| Paper 26.3 | 25 or newer |
 
 Spigot, Folia, older Minecraft releases, and unofficial Paper forks are not supported.

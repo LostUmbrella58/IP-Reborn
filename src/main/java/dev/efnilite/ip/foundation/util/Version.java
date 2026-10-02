@@ -78,7 +78,16 @@ public enum Version {
      * @return the version.
      */
     public static Version getVersion() {
-        String pretty = getPrettyVersion();
+        VERSION = resolve(getPrettyVersion());
+        return VERSION;
+    }
+
+    /**
+     * Resolves feature gates without requiring a running server. Calendar versions
+     * such as 26.3 (including prereleases and Paper build suffixes) use the newest
+     * known feature path; the enum's legacy names are not displayed as MC versions.
+     */
+    static Version resolve(String pretty) {
         var parts = pretty.split("\\.");
 
         // Try to parse standard "1.MAJOR[.MINOR]" first. If parts[0] is not "1", we
@@ -94,12 +103,10 @@ public enum Version {
                 // numbering). Clamp to the latest known enum entry — for vilib's
                 // purposes (gating feature use) "newer than I know about" is the same
                 // as "use the newest path."
-                VERSION = Version.values()[Version.values().length - 1];
-                return VERSION;
+                return Version.values()[Version.values().length - 1];
             }
         } catch (NumberFormatException ex) {
-            VERSION = Version.values()[Version.values().length - 1];
-            return VERSION;
+            return Version.values()[Version.values().length - 1];
         }
 
         final int finalMajor = major;
@@ -116,12 +123,10 @@ public enum Version {
             // Server is older than every known entry — fall back to the oldest one
             // rather than crashing on get(-1). This path only triggers on
             // pre-1.16 servers, which we never officially supported anyway.
-            VERSION = Version.values()[0];
+            return Version.values()[0];
         } else {
-            VERSION = lowerVersions.get(lowerVersions.size() - 1);
+            return lowerVersions.get(lowerVersions.size() - 1);
         }
-
-        return VERSION;
     }
 
     /**

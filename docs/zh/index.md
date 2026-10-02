@@ -37,5 +37,6 @@ features:
 | Paper 1.21.11 | Java 21 或更高 |
 | Paper 26.1.2 | Java 25 或更高 |
 | Paper 26.2 | Java 25 或更高 |
+| Paper 26.3 | Java 25 或更高 |
 
 不支持 Spigot、Folia、更旧的 Minecraft 版本及非官方 Paper 分支。

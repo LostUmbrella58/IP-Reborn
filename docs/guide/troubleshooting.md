@@ -2,7 +2,7 @@
 
 ## The plugin does not load
 
-1. Confirm the server is Paper 1.21.11, 26.1.2, or 26.2.
+1. Confirm the server is Paper 1.21.11, 26.1.2, 26.2, or 26.3.
 2. Confirm Java 21+ for Paper 1.21.11 or Java 25+ for Paper 26.
 3. Remove old IPPlus and IEP jars; only one Infinite Parkour Reborn jar should be installed.
 4. Read the first exception in the console, not only the final “disabled” message.
