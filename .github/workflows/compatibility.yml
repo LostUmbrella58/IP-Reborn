@@ -34,5 +34,4 @@ jobs:
           cache: maven
       - name: Verify
         run: |
-          chmod +x ./mvnw
-          ./mvnw -B clean verify -Dpaper.version=${{ matrix.paper }}
+          mvn -B clean verify -Dpaper.version=${{ matrix.paper }}

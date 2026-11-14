@@ -41,16 +41,16 @@ The default build targets Paper 1.21.11 and emits Java 21 bytecode, retaining
 compatibility with that server version while supporting Paper 26.3:
 
 ```powershell
-.\mvnw.cmd -B clean verify
+mvn -B clean verify
 ```
 
 Other supported API baselines can be checked without editing the POM. Use JDK 25
 for these builds; the plugin still emits Java 21 bytecode:
 
 ```powershell
-.\mvnw.cmd -B clean verify -Dpaper.version=26.1.2.build.74-stable
-.\mvnw.cmd -B clean verify -Dpaper.version=26.2.build.84-stable
-.\mvnw.cmd -B clean verify -Dpaper.version=26.3.build.142-beta
+mvn -B clean verify -Dpaper.version=26.1.2.build.74-stable
+mvn -B clean verify -Dpaper.version=26.2.build.84-stable
+mvn -B clean verify -Dpaper.version=26.3.build.142-beta
 ```
 
 The shaded plugin jar is written to `target/IP-6.0.2.jar`.
