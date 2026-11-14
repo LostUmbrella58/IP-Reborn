@@ -2,33 +2,34 @@
 
 The Java API exposes player/session lookup, registries, and Bukkit events. Add Infinite Parkour Reborn as a compile-only/provided dependency and declare it as a dependency or soft dependency in your plugin metadata.
 
-## JitPack dependency
+## Dependency
 
-Replace `VERSION` with a Git tag or commit available from the repository.
+The plugin is not published to a Maven repository. Build it once and install it into your local Maven repository:
+
+```text
+mvn -B clean install
+```
+
+Then add it as a provided/compile-only dependency:
 
 ::: code-group
 
 ```xml [Maven]
-<repository>
-  <id>jitpack.io</id>
-  <url>https://jitpack.io</url>
-</repository>
-
 <dependency>
-  <groupId>com.github.LostUmbrella58</groupId>
-  <artifactId>IP-Reborn</artifactId>
-  <version>VERSION</version>
+  <groupId>dev.efnilite</groupId>
+  <artifactId>IP</artifactId>
+  <version>6.0.2</version>
   <scope>provided</scope>
 </dependency>
 ```
 
 ```kotlin [Gradle Kotlin DSL]
 repositories {
-    maven("https://jitpack.io")
+    mavenLocal()
 }
 
 dependencies {
-    compileOnly("com.github.LostUmbrella58:IP-Reborn:VERSION")
+    compileOnly("dev.efnilite:IP:6.0.2")
 }
 ```
 

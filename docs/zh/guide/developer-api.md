@@ -2,33 +2,34 @@
 
 Java API 提供玩家/会话查询、注册表和 Bukkit 事件。将 Infinite Parkour Reborn 作为 compile-only/provided 依赖，并在你的插件元数据中声明依赖或软依赖。
 
-## JitPack 依赖
+## 依赖
 
-将 `VERSION` 替换为仓库中存在的 Git 标签或提交。
+插件没有发布到 Maven 仓库。先编译一次并安装到本地 Maven 仓库：
+
+```text
+mvn -B clean install
+```
+
+然后以 provided/compile-only 方式添加依赖：
 
 ::: code-group
 
 ```xml [Maven]
-<repository>
-  <id>jitpack.io</id>
-  <url>https://jitpack.io</url>
-</repository>
-
 <dependency>
-  <groupId>com.github.LostUmbrella58</groupId>
-  <artifactId>IP-Reborn</artifactId>
-  <version>VERSION</version>
+  <groupId>dev.efnilite</groupId>
+  <artifactId>IP</artifactId>
+  <version>6.0.2</version>
   <scope>provided</scope>
 </dependency>
 ```
 
 ```kotlin [Gradle Kotlin DSL]
 repositories {
-    maven("https://jitpack.io")
+    mavenLocal()
 }
 
 dependencies {
-    compileOnly("com.github.LostUmbrella58:IP-Reborn:VERSION")
+    compileOnly("dev.efnilite:IP:6.0.2")
 }
 ```
 
