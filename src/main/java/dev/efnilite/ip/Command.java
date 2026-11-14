@@ -10,6 +10,7 @@ import dev.efnilite.ip.mode.Mode;
 import dev.efnilite.ip.mode.Modes;
 import dev.efnilite.ip.mode.MultiMode;
 import dev.efnilite.ip.player.ParkourPlayer;
+import dev.efnilite.ip.player.ParkourSpectator;
 import dev.efnilite.ip.player.ParkourUser;
 import dev.efnilite.ip.player.data.InventoryData;
 import dev.efnilite.ip.session.Session;
@@ -21,6 +22,7 @@ import dev.efnilite.ip.foundation.schematic.Schematic;
 import dev.efnilite.ip.foundation.schematic.Schematics;
 import dev.efnilite.ip.foundation.util.Locations;
 import dev.efnilite.ip.foundation.util.Strings;
+import dev.efnilite.ip.foundation.util.Task;
 import org.bukkit.*;
 import org.bukkit.command.BlockCommandSender;
 import org.bukkit.command.CommandSender;
@@ -215,7 +217,7 @@ public class Command extends ViCommand {
                 ParkourUser.leave(player);
             }
             case "menu", "main" -> {
-                if (!ParkourOption.MAIN.mayPerform(player)) {
+                if (ParkourOption.MAIN.mayPerform(player)) {
                     Menus.MAIN.open(player);
                 }
             }
@@ -298,6 +300,9 @@ public class Command extends ViCommand {
                 }
 
                 if (arg2.equalsIgnoreCase("everyone")) {
+                    // spectators first: if the last player of a session leaves while spectators
+                    // remain, those spectators get moved into a new game instead of leaving.
+                    ParkourUser.getUsers().stream().filter(user -> user instanceof ParkourSpectator).forEach(ParkourUser::leave);
                     ParkourPlayer.getPlayers().forEach(ParkourUser::leave);
                     send(sender, IP.PREFIX + "Successfully force kicked everyone!");
                     return;
@@ -386,15 +391,22 @@ public class Command extends ViCommand {
                     return;
                 }
 
-                new InventoryData(other).load(result -> {
-                    if (result != null) {
+                if (ParkourUser.isUser(other)) {
+                    send(sender, "%s%s is currently playing. Make them leave first.".formatted(IP.PREFIX, other.getName()));
+                    return;
+                }
+
+                // load() finishes on an async thread; hop back to the main thread before touching the inventory
+                new InventoryData(other).load(result -> Task.create(IP.getPlugin()).execute(() -> {
+                    if (result != null && other.isOnline()) {
                         send(sender, "%sSuccessfully recovered the inventory of %s from their file".formatted(IP.PREFIX, other.getName()));
                         send(sender, "%sGiving %s their items now...".formatted(IP.PREFIX, other.getName()));
+                        result.apply();
                     } else {
                         send(sender, "%s<red>There was an error recovering the inventory of %s from their file".formatted(IP.PREFIX, other.getName()));
-                        send(sender, "%s%s has no saved inventory or there was an error. Check the console.".formatted(IP.PREFIX, other.getName()));
+                        send(sender, "%s%s has no saved inventory, went offline or there was an error. Check the console.".formatted(IP.PREFIX, other.getName()));
                     }
-                });
+                }).run());
             }
         }
 
@@ -483,6 +495,10 @@ public class Command extends ViCommand {
 
                         selections.put(player, new Location[]{playerLocation, existingSelection[1]});
 
+                        if (existingSelection[1] == null) {
+                            return;
+                        }
+
                         Particles.box(BoundingBox.of(playerLocation, existingSelection[1]), player.getWorld(), new ParticleData<>(Particle.END_ROD, null, 2), player, 0.2);
                     }
                     case "pos2" -> {
@@ -494,6 +510,10 @@ public class Command extends ViCommand {
                         }
 
                         selections.put(player, new Location[]{existingSelection[0], playerLocation});
+
+                        if (existingSelection[0] == null) {
+                            return;
+                        }
 
                         Particles.box(BoundingBox.of(existingSelection[0], playerLocation), player.getWorld(), new ParticleData<>(Particle.END_ROD, null, 2), player, 0.2);
                     }
@@ -509,9 +529,12 @@ public class Command extends ViCommand {
 
                         String code = UUID.randomUUID().toString().split("-")[0];
 
-                        send(player, ("<dark_red><bold>Schematics <reset><gray>Your schematic is being saved. It will use code <red>'%s'<gray>. " + "You can change the code to whatever you like. " + "Don't forget to add this schematic to <dark_gray>schematics.yml<gray>.").formatted(code));
+                        if (!Schematic.save(IP.getInFolder("schematics/parkour-%s".formatted(code)), existingSelection[0], existingSelection[1], IP.getPlugin())) {
+                            send(player, "<dark_red><bold>Schematics <reset><gray>Your selection only contains air, so nothing was saved.");
+                            return;
+                        }
 
-                        Schematic.save(IP.getInFolder("schematics/parkour-%s".formatted(code)), existingSelection[0], existingSelection[1], IP.getPlugin());
+                        send(player, ("<dark_red><bold>Schematics <reset><gray>Your schematic is being saved. It will use code <red>'%s'<gray>. " + "You can change the code to whatever you like. " + "Don't forget to add this schematic to <dark_gray>schematics.yml<gray>.").formatted(code));
                     }
                 }
             }

@@ -1,6 +1,7 @@
 package dev.efnilite.ipp.generator.single;
 
 import dev.efnilite.ip.generator.GeneratorOption;
+import dev.efnilite.ip.leaderboard.Leaderboard;
 import dev.efnilite.ip.leaderboard.Score;
 import dev.efnilite.ip.menu.ParkourOption;
 import dev.efnilite.ip.menu.settings.ParkourSettingsMenu;
@@ -8,6 +9,7 @@ import dev.efnilite.ip.mode.Mode;
 import dev.efnilite.ip.session.Session;
 import dev.efnilite.ipp.IPP;
 import dev.efnilite.ipp.mode.PlusMode;
+import dev.efnilite.ipp.util.PlusLogic;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 /**
@@ -25,7 +27,7 @@ public final class TimeTrialGenerator extends PlusGenerator {
     };
 
     private final int goal = IPP.getConfiguration().getFile("config").getInt("gamemodes.%s.goal".formatted(getMode().getName().toLowerCase()));
-    private final int interval = goal / COLOUR_GRADIENTS.length;
+    private final int interval = PlusLogic.barInterval(goal, COLOUR_GRADIENTS.length);
 
     public TimeTrialGenerator(Session session) {
         // setup settings for generation
@@ -53,7 +55,7 @@ public final class TimeTrialGenerator extends PlusGenerator {
                 if (i >= score) {
                     bar.append("<reset><dark_gray>");
                 } else {
-                    bar.append("<bold><").append(COLOUR_GRADIENTS[i / interval]).append(">");
+                    bar.append("<bold><").append(COLOUR_GRADIENTS[PlusLogic.gradientIndex(i, interval, COLOUR_GRADIENTS.length)]).append(">");
                 }
                 bar.append("|");
             }
@@ -70,7 +72,11 @@ public final class TimeTrialGenerator extends PlusGenerator {
 
         score = goal;
 
-        getMode().getLeaderboard().put(player.getUUID(), new Score(player.getName(), time, difficulty, score));
+        // only replace the entry if this run is faster than the stored one
+        Leaderboard leaderboard = getMode().getLeaderboard();
+        if (leaderboard != null && PlusLogic.isBetterTime(time, leaderboard.get(player.getUUID()))) {
+            leaderboard.put(player.getUUID(), new Score(player.getName(), time, difficulty, score));
+        }
 
         player.teleport(player.getLocation().subtract(0, 15, 0));
     }

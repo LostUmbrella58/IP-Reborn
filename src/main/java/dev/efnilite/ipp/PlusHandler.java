@@ -4,6 +4,7 @@ import dev.efnilite.ip.foundation.inventory.item.Item;
 import dev.efnilite.ip.player.ParkourPlayer;
 import dev.efnilite.ipp.config.PlusLocales;
 import dev.efnilite.ipp.generator.multi.DuelsGenerator;
+import dev.efnilite.ipp.util.PlusLogic;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -42,14 +43,11 @@ public class PlusHandler implements Listener {
 
     @EventHandler
     public void command(PlayerCommandPreprocessEvent event) {
-        String message = event.getMessage().toLowerCase();
+        // Paper dispatches getMessage().substring(1), so the rewritten message must keep its leading slash
+        String rewritten = PlusLogic.rewriteParkourCommand(event.getMessage());
 
-        if (message.contains("parkour create")) {
-            event.setMessage("ipp create");
-        } else if (message.contains("parkour lobbies")) {
-            event.setMessage("ipp lobbies");
-        } else if (message.contains("parkour invite")) {
-            event.setMessage("ipp invite");
+        if (rewritten != null) {
+            event.setMessage(rewritten);
         }
     }
 }

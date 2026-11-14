@@ -9,10 +9,12 @@ import dev.efnilite.iep.menu.SettingsMenu
 import dev.efnilite.iep.mode.DefaultMode
 import dev.efnilite.iep.player.ElytraPlayer
 import dev.efnilite.iep.player.ElytraPlayer.Companion.asElytraPlayer
+import dev.efnilite.iep.player.PreviousData
 import dev.efnilite.iep.world.World
 import dev.efnilite.ip.foundation.event.EventWatcher
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
+import org.bukkit.event.EventPriority
 import org.bukkit.event.block.Action
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.EntityDamageEvent
@@ -44,6 +46,15 @@ object Events : EventWatcher {
         if (event.player.world == World.world) return
 
         player.leave()
+    }
+
+    /**
+     * Puts back the state of a player who was in elytra parkour when the server crashed.
+     * LOWEST so it runs before join-on-join and other plugins' join handling.
+     */
+    @EventHandler(priority = EventPriority.LOWEST)
+    fun restore(event: PlayerJoinEvent) {
+        PreviousData.restoreLeftover(event.player)
     }
 
     @EventHandler

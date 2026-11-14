@@ -152,7 +152,18 @@ public final class IP extends ParkourPlugin {
             logging.stack("Failed to enable the hologram subsystem — continuing without holograms", t);
         }
 
-        UpdateChecker.check(this, 136046);
+        // update-checker is merged into existing configs by ConfigUpdater, but default to
+        // enabled if the key is somehow missing so old configs keep the previous behaviour.
+        if (!Config.CONFIG.isPath("update-checker") || Config.CONFIG.getBoolean("update-checker")) {
+            UpdateChecker.check(this, 136046);
+        }
+    }
+
+    /**
+     * @return True when the elytra parkour module enabled successfully.
+     */
+    public boolean isElytraEnabled() {
+        return elytraEnabled;
     }
 
     /**
@@ -185,46 +196,69 @@ public final class IP extends ParkourPlugin {
             logging.stack("Error while disabling the hologram subsystem", t);
         }
 
+        // Restore every IP user FIRST, synchronously. Paper defers teleportAsync to a later
+        // tick which never runs during shutdown (players are saved/kicked before that), so
+        // the urgent path teleports and re-applies inventory/gamemode immediately.
+        for (ParkourUser user : ParkourUser.getUsers()) {
+            try {
+                ParkourUser.unregister(user, true, false, true);
+            } catch (Throwable t) {
+                logging.stack("Error while leaving user on disable", t);
+            }
+        }
+
+        if (plusEnabled) {
+            try {
+                IPP.disable();
+            } catch (Throwable t) {
+                logging.stack("Error while disabling the former IPPlus modes", t);
+            }
+        }
+
+        if (elytraEnabled) {
+            try {
+                IEP.INSTANCE.disable();
+            } catch (Throwable t) {
+                logging.stack("Error while disabling elytra parkour", t);
+            }
+        }
+
         try {
             IntegrationLoader.disable(this, serverIntegrations);
-            serverIntegrations = List.of();
+        } catch (Throwable t) {
+            logging.stack("Error while disabling server integrations", t);
+        }
+        serverIntegrations = List.of();
 
+        try {
             if (placeholderHook != null) {
                 placeholderHook.unregister();
-                placeholderHook = null;
             }
+        } catch (Throwable t) {
+            logging.stack("Error while unregistering the PlaceholderAPI hook", t);
+        } finally {
+            placeholderHook = null;
+        }
 
-            if (elytraEnabled) {
-                try {
-                    IEP.INSTANCE.disable();
-                } catch (Throwable t) {
-                    logging.stack("Error while disabling elytra parkour", t);
-                }
-            }
-
-            if (plusEnabled) {
-                try {
-                    IPP.disable();
-                } catch (Throwable t) {
-                    logging.stack("Error while disabling the former IPPlus modes", t);
-                }
-            }
-
-            for (ParkourUser user : ParkourUser.getUsers()) {
-                try {
-                    ParkourUser.leave(user);
-                } catch (Throwable t) {
-                    logging.stack("Error while leaving user on disable", t);
-                }
-            }
-
+        try {
             // write all IP gamemodes
-            Modes.DEFAULT.getLeaderboard().write(false);
+            if (Modes.DEFAULT != null) {
+                Modes.DEFAULT.getLeaderboard().write(false);
+            }
+        } catch (Throwable t) {
+            logging.stack("Error while writing the default leaderboard", t);
+        }
 
+        try {
             Storage.close();
-            World.delete();
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            logging.stack("Error while closing storage", t);
+        }
 
+        try {
+            World.delete();
+        } catch (Throwable t) {
+            logging.stack("Error while deleting the parkour world", t);
         } finally {
             // Defensive clear so static state never survives a failed disable
             // (e.g. /reload) and leak Sessions / Players across plugin lifecycles.

@@ -65,6 +65,16 @@ public final class TrackedHologram {
 
     public Entry config() { return config; }
     public boolean isDestroyed() { return destroyed; }
+
+    /**
+     * @return True when this hologram was spawned and its main entities still exist in the world.
+     * False when they were removed externally (e.g. /kill, world unload).
+     */
+    public boolean isHealthy() {
+        return !destroyed
+                && textDisplay != null && textDisplay.isValid()
+                && interaction != null && interaction.isValid();
+    }
     public int currentPage() { return currentPage; }
     public int pageCount() { return config.pages().size(); }
 

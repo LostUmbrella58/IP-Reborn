@@ -140,6 +140,18 @@ open class Generator {
     // "FastBoard is deleted" exception thrown when updateBoard runs post-leave.
     @Volatile
     private var stopped: Boolean = false
+    // True once start() has run; remove() only tears down island/sections after that.
+    private var started = false
+    // Bumped on every reset/remove. Async section generation captures it and drops its
+    // result if a reset happened in between, so a discarded section is never displayed.
+    @Volatile
+    private var epoch = 0
+
+    /**
+     * True once this generator has been removed (the player left).
+     */
+    val isStopped: Boolean
+        get() = stopped
     // Handle to the delayed queue task for the FIRST section. We hold it so reset()
     // can cancel a stale pending queue — without that, a quick reset between
     // generate() and the delayed queue firing would let an orphan task push the old
@@ -179,12 +191,11 @@ open class Generator {
      * Adds a player to the generator.
      * @param player The player to add.
      */
-    fun add(player: ElytraPlayer) {
+    fun add(player: ElytraPlayer, settings: Settings) {
         IEP.log("Adding player to generator ${player.name}")
 
         this.player = player
-
-        settings = player.load()
+        this.settings = settings
     }
 
     /**
@@ -200,11 +211,14 @@ open class Generator {
         // Set the stop flag BEFORE doing anything else — even if BukkitTask.cancel()
         // doesn't take effect synchronously, the next tick will bail at the top.
         stopped = true
+        epoch++
 
-        try {
-            player.save(settings)
-        } catch (t: Throwable) {
-            IEP.logging.stack("Failed to save settings for ${player.name}", t)
+        if (::settings.isInitialized) {
+            try {
+                player.save(settings)
+            } catch (t: Throwable) {
+                IEP.logging.stack("Failed to save settings for ${player.name}", t)
+            }
         }
 
         // Cancel tick FIRST so no new work scheduled after we start tearing down.
@@ -213,13 +227,16 @@ open class Generator {
         try { pendingFirstQueue?.cancel() } catch (_: Throwable) {}
         pendingFirstQueue = null
 
-        try {
-            reset(ResetReason.RESET, false)
-        } catch (t: Throwable) {
-            IEP.logging.stack("Failed to reset generator for ${player.name}", t)
-        }
+        // Nothing was built yet if the player left before setup finished.
+        if (started) {
+            try {
+                reset(ResetReason.RESET, false)
+            } catch (t: Throwable) {
+                IEP.logging.stack("Failed to reset generator for ${player.name}", t)
+            }
 
-        try { island.clear() } catch (_: Throwable) { /* island may not have been built */ }
+            try { island.clear() } catch (_: Throwable) { /* island may not have been built */ }
+        }
         try { blockChanger.clear() } catch (_: Throwable) {}
 
         Divider.remove(this)
@@ -234,9 +251,13 @@ open class Generator {
     open fun start(mode: Mode, start: Vector, point: PointType) {
         IEP.log("Starting generator at $start")
 
+        if (stopped) return
+        started = true
+
         rewardHandler = RewardHandler(mode)
         leaderboard = mode.leaderboard
-        island = Island(start, Schematics.getSchematic(IEP.instance, "spawn-island"))
+        island = Island(start, Schematics.getSchematic(IEP.instance, "spawn-island")
+            ?: error("The spawn-island schematic has not been loaded yet"))
         pointType = point
 
         player.player.setPlayerTime(settings.time.toLong(), false)
@@ -544,11 +565,17 @@ open class Generator {
             // queue a stale block map into a freshly-cleared toChange.
             pendingFirstQueue?.cancel()
             pendingFirstQueue = null
-            section.generate(settings, pointType).thenApply { blockMap ->
+            val generation = epoch
+            section.generate(settings, pointType).thenAccept { blockMap ->
                 waitForDisplay.thenRun {
+                    // This continuation runs off-thread, so a reset may already have
+                    // happened before the task handle below was stored (reset() could not
+                    // cancel it). The epoch checks here and inside the task drop the stale map.
+                    if (generation != epoch || stopped) return@thenRun
+
                     pendingFirstQueue = Task.create(IEP.instance)
                         .delay(15)
-                        .execute { blockChanger.queue(blockMap) }
+                        .execute { blockChanger.queueIf(blockMap) { generation == epoch && !stopped } }
                         .run()
                 }
             }
@@ -578,7 +605,10 @@ open class Generator {
 
         IEP.log("Generating section at ${idx + 1} (ascending=${section.isAscending}, endY was ${end.y})")
 
-        section.generate(settings, pointType).thenApply { blockChanger.queue(it) }
+        val generation = epoch
+        section.generate(settings, pointType).thenAccept { blockMap ->
+            blockChanger.queueIf(blockMap) { generation == epoch && !stopped }
+        }
     }
 
     // resetPlayerHeight was deleted alongside the clone-and-teleport mechanic. It used
@@ -615,6 +645,10 @@ open class Generator {
         overrideSeedSettings: Boolean = false
     ) {
         IEP.log("Resetting generator, regenerate = $regenerate, seed = $s")
+
+        // Invalidate in-flight async section generation BEFORE blockChanger.clear() below,
+        // so a late completion can't push the old sections back into the fresh queue.
+        epoch++
 
         if (getScore() > 0.0) {
             val score = Score(

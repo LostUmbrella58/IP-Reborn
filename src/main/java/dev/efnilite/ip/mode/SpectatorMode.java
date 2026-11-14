@@ -1,5 +1,6 @@
 package dev.efnilite.ip.mode;
 
+import dev.efnilite.ip.IP;
 import dev.efnilite.ip.config.Config;
 import dev.efnilite.ip.config.Locales;
 import dev.efnilite.ip.leaderboard.Leaderboard;
@@ -39,11 +40,28 @@ public class SpectatorMode implements Mode {
     }
 
     public void create(Player player, Session session) {
+        if (!IP.getPlugin().isEnabled()) {
+            return;
+        }
+
         if (!Config.CONFIG.getBoolean("joining")) {
             player.sendMessage(Strings.colour("<red><bold>Joining is currently disabled."));
             return;
         }
         if (!ParkourOption.SPECTATOR.mayPerform(player)) {
+            player.sendMessage(Locales.getString(player, "other.no_do"));
+            return;
+        }
+
+        // respect the session's visibility, also for /ip join <player>: private sessions can't be
+        // spectated, invite-only (ID_ONLY) sessions can be joined by name, and public sessions
+        // follow the session's own spectator rule
+        boolean refused = switch (session.getVisibility()) {
+            case PRIVATE -> true;
+            case ID_ONLY -> false;
+            default -> !session.isAcceptingSpectators();
+        };
+        if (refused) {
             player.sendMessage(Locales.getString(player, "other.no_do"));
             return;
         }

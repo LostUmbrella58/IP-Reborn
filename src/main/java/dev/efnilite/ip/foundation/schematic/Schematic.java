@@ -117,24 +117,37 @@ public class Schematic {
     }
 
     /**
-     * Saves the selection between the two locations asynchronously to file.
+     * Saves the selection between the two locations to file.
+     * Blocks are read on the calling thread (must be the main thread), the file is written asynchronously.
      *
      * @param file The file.
      * @param pos1 The first position.
      * @param pos2 The second position.
+     * @return False when the selection only contains air and nothing was saved, true otherwise.
      */
-    public static void save(String file, Location pos1, Location pos2, Plugin plugin) {
-        save(new File(file), pos1, pos2, plugin);
+    public static boolean save(String file, Location pos1, Location pos2, Plugin plugin) {
+        return save(new File(file), pos1, pos2, plugin);
     }
 
     /**
-     * Saves the selection between the two locations asynchronously to file.
+     * Saves the selection between the two locations to file.
+     * Blocks are read on the calling thread (must be the main thread), the file is written asynchronously.
      *
      * @param file The file.
      * @param pos1 The first position.
      * @param pos2 The second position.
+     * @return False when the selection only contains air and nothing was saved, true otherwise.
      */
-    public static void save(File file, Location pos1, Location pos2, Plugin plugin) {
-        Task.create(plugin).async().execute(() -> new SchematicWriter().save(file, pos1, pos2, plugin)).run();
+    public static boolean save(File file, Location pos1, Location pos2, Plugin plugin) {
+        SchematicWriter writer = new SchematicWriter();
+        SchematicWriter.Snapshot snapshot = writer.snapshot(pos1, pos2);
+
+        if (snapshot == null) {
+            plugin.getLogger().warning("Not saving schematic %s: the selection only contains air".formatted(file.getName()));
+            return false;
+        }
+
+        Task.create(plugin).async().execute(() -> writer.write(file, snapshot, plugin)).run();
+        return true;
     }
 }

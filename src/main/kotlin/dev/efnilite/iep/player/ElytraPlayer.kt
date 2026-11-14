@@ -4,6 +4,7 @@ import com.google.common.io.ByteStreams
 import dev.efnilite.iep.IEP
 import dev.efnilite.iep.config.Config
 import dev.efnilite.iep.config.Locales
+import dev.efnilite.iep.generator.Generator
 import dev.efnilite.iep.generator.Settings
 import dev.efnilite.iep.leaderboard.Score.Companion.pretty
 import dev.efnilite.iep.mode.Mode
@@ -19,7 +20,9 @@ import org.bukkit.Location
 import org.bukkit.entity.Player
 import org.bukkit.plugin.messaging.ChannelNotRegisteredException
 import org.bukkit.util.Vector
+import java.util.*
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Class for wrapping players.
@@ -33,7 +36,7 @@ import java.util.concurrent.CompletableFuture
  *    long session the player ended up with hundreds of zombie objectives in their packet
  *    history and Paper kept their packet listeners pinned).
  */
-class ElytraPlayer(val player: Player, private val data: PreviousData = PreviousData(player)) {
+class ElytraPlayer(val player: Player) {
 
     val position
         get() = player.location.toVector()
@@ -41,28 +44,113 @@ class ElytraPlayer(val player: Player, private val data: PreviousData = Previous
     val name = player.name
     val uuid = player.uniqueId
 
+    // The player's state from before they entered IEP. Captured when the first mode actually
+    // starts (not at construction, so nothing done while settings load is lost or duplicated)
+    // and kept across mode switches, since only the final leave restores it.
+    private var data: PreviousData? = null
+
     private var boardTitle = ""
     private var boardLines = listOf<String>()
-    private val board = FastBoard(player)
+    // Created per started mode: leave() always deletes it, including on a mode switch.
+    private var board: FastBoard? = null
 
     /**
      * Joins a [Mode].
+     * @param settings The settings to use. When null (a fresh join) they're loaded off the
+     * main thread first, so MySQL/disk IO never blocks the server.
      */
-    fun join(mode: Mode) {
+    fun join(mode: Mode, settings: Settings? = null) {
+        if (settings != null) {
+            start(mode, settings)
+            return
+        }
+
+        if (!joining.add(uuid)) return // a join for this player is already loading
+
+        Task.create(IEP.instance)
+            .async()
+            .execute {
+                val loaded = load()
+
+                Task.create(IEP.instance)
+                    .execute {
+                        joining.remove(uuid)
+
+                        // Bail if the player joined block parkour while their settings were loading.
+                        if (!player.isOnline || IEP.stopping || player.asElytraPlayer() != null ||
+                            dev.efnilite.ip.player.ParkourUser.isUser(player)) return@execute
+
+                        start(mode, loaded)
+                    }
+                    .run()
+            }
+            .run()
+    }
+
+    private fun start(mode: Mode, settings: Settings) {
         IEP.log("Creating generator for ${player.name} with mode ${mode.name}")
 
-        val generator = mode.getGenerator()
+        val data = this.data ?: PreviousData(player).also { this.data = it }
 
+        if (board?.isDeleted != false) {
+            board = FastBoard(player)
+            boardTitle = ""
+        }
+
+        val generator = mode.getGenerator()
         val at = Divider.add(generator)
 
-        generator.add(this)
+        try {
+            generator.add(this, settings)
+        } catch (t: Throwable) {
+            abortJoin(generator, t)
+            return
+        }
 
-        data.setup(at).thenRun { generator.start(mode, at, mode.pointType) }
+        data.setup(at) { !generator.isStopped && player.isOnline }
+            .whenComplete { ready, ex ->
+                // Left (quit, /iep leave, mode switch) while the teleport was pending:
+                // leave() already restored everything, so don't build anything.
+                if (generator.isStopped) return@whenComplete
+
+                if (ex != null || ready != true) {
+                    abortJoin(generator, ex)
+                    return@whenComplete
+                }
+
+                try {
+                    generator.start(mode, at, mode.pointType)
+                } catch (t: Throwable) {
+                    abortJoin(generator, t)
+                }
+            }
+    }
+
+    /**
+     * Undoes a join that couldn't complete: unregisters the generator and restores the player.
+     */
+    private fun abortJoin(generator: Generator, cause: Throwable?) {
+        if (cause != null) {
+            IEP.logging.stack("Failed to start elytra parkour for ${player.name}", cause)
+        } else {
+            IEP.logging.error("Failed to start elytra parkour for ${player.name}: teleport was not completed")
+        }
+
+        try {
+            generator.remove(this)
+        } catch (t: Throwable) {
+            IEP.logging.stack("Error while removing ${player.name} from their generator", t)
+        }
+        Divider.remove(generator)
+
+        data?.reset(switchMode = false, urgent = false)
+        deleteBoard()
     }
 
     /**
      * Leaves the current mode. The FastBoard is deleted unconditionally — previously
      * it was kept across mode switches, which leaked a scoreboard objective per switch.
+     * A following [join] on a mode switch creates a new one.
      *
      * <b>Ordering matters.</b> The Generator's tick task references this.board. If we
      * delete the board first, then cancel the task, a pending mid-tick can fire one
@@ -89,12 +177,33 @@ class ElytraPlayer(val player: Player, private val data: PreviousData = Previous
             return
         }
 
-        data.reset(switchMode, urgent)
+        data?.reset(switchMode, urgent)
 
-        // Always delete — even on mode switch. The next ElytraPlayer for this Player
-        // will instantiate its own FastBoard via the field initializer; keeping the
-        // old one alive just leaks packet listeners.
+        deleteBoard()
+    }
+
+    /**
+     * Leaves elytra parkour because the player is joining block parkour. Restores the
+     * pre-join state synchronously and never forwards to the proxy return server.
+     */
+    fun leaveForBlockParkour() {
+        val gen = Divider.generators.firstOrNull { it.player == this }
+        if (gen != null) {
+            try {
+                gen.remove(this)
+            } catch (t: Throwable) {
+                IEP.logging.stack("Error while removing ${player.name} from their generator", t)
+            }
+        }
+
+        data?.reset(switchMode = false, urgent = true)
+
+        deleteBoard()
+    }
+
+    private fun deleteBoard() {
         try {
+            val board = board ?: return
             if (!board.isDeleted) board.delete()
         } catch (_: Throwable) {
             // FastBoard.delete() can throw if the player has already disconnected;
@@ -172,6 +281,7 @@ class ElytraPlayer(val player: Player, private val data: PreviousData = Previous
      * the scoreboard from the player's screen.
      */
     fun updateBoard(score: Double, time: String, seed: Int) {
+        val board = board ?: return
         if (board.isDeleted || !player.isOnline) return
 
         if (boardTitle.isEmpty()) {
@@ -235,15 +345,23 @@ class ElytraPlayer(val player: Player, private val data: PreviousData = Previous
     fun load(): Settings {
         IEP.log("Loading settings for $name")
 
-        Storage.init(uuid)
+        val defaults = DEFAULT_SETTINGS
 
-        return Storage.load(uuid) ?: DEFAULT_SETTINGS
+        return try {
+            Storage.init(uuid)
+
+            Storage.load(uuid)?.let { Settings.sanitized(it, defaults) } ?: defaults
+        } catch (t: Throwable) {
+            IEP.logging.stack("Failed to load settings for $name, using defaults", t)
+            defaults
+        }
     }
 
     /**
      * Adds a reward to the player's settings.
      */
     fun addReward(mode: Mode, reward: Reward) {
+        val data = data ?: return
         val set = data.leaveRewards[mode] ?: mutableSetOf()
 
         set += reward
@@ -269,6 +387,9 @@ class ElytraPlayer(val player: Player, private val data: PreviousData = Previous
     fun getGenerator() = Divider.generators.first { it.player == this }
 
     companion object {
+
+        // Players whose settings are being loaded for a fresh join.
+        private val joining: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
 
         val DEFAULT_SETTINGS
             get() = Settings(locale = Config.CONFIG.getString("settings.locale.default"),

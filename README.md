@@ -6,7 +6,7 @@ created by Efnilite.
 
 ## Supported servers
 
-Infinite Parkour Reborn 6.0.1 supports the following server versions:
+Infinite Parkour Reborn 6.0.2 supports the following server versions:
 
 - Paper 1.21.11 on Java 21
 - Paper 26.1.2 on Java 25
@@ -53,7 +53,7 @@ for these builds; the plugin still emits Java 21 bytecode:
 .\mvnw.cmd -B clean verify -Dpaper.version=26.3.build.142-beta
 ```
 
-The shaded plugin jar is written to `target/IP-6.0.1.jar`.
+The shaded plugin jar is written to `target/IP-6.0.2.jar`.
 
 This project is licensed under GPL-3.0. See [NOTICE.md](NOTICE.md) for upstream
 attribution.

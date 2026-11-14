@@ -8,6 +8,7 @@ import dev.efnilite.ip.mode.Mode;
 import dev.efnilite.ip.session.Session;
 import dev.efnilite.ipp.config.PlusConfigOption;
 import dev.efnilite.ipp.mode.PlusMode;
+import dev.efnilite.ipp.util.PlusLogic;
 import org.bukkit.Location;
 import org.bukkit.Material;
 
@@ -52,10 +53,10 @@ public final class HourglassGenerator extends PlusGenerator {
         Duration delta = Duration.between(countdown, Instant.now()).abs();
         StringBuilder bar = new StringBuilder(); // build bar with time remaining
 
-        int increments = (PlusConfigOption.HOURGLASS_TIME / 20);
+        int increments = PlusLogic.barInterval(PlusConfigOption.HOURGLASS_TIME, 20);
         int time = Math.min((int) delta.toMillis() / increments, 20);
 
-        bar.append("<").append(GRADIENT_COLOURS[time > 0 ? time - 1 : time]).append(">").append("<bold>");
+        bar.append("<").append(GRADIENT_COLOURS[PlusLogic.gradientIndex(time > 0 ? time - 1 : time, 1, GRADIENT_COLOURS.length)]).append(">").append("<bold>");
 
         for (int i = 20; i > 0; i--) { // countDOWN
             if (i == time) {

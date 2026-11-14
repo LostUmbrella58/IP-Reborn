@@ -1,11 +1,11 @@
 package dev.efnilite.ip.menu.play;
 
+import dev.efnilite.ip.IP;
 import dev.efnilite.ip.config.Locales;
 import dev.efnilite.ip.menu.DynamicMenu;
 import dev.efnilite.ip.menu.Menus;
 import dev.efnilite.ip.menu.ParkourOption;
 import dev.efnilite.ip.foundation.inventory.Menu;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 /**
@@ -20,7 +20,8 @@ public class PlayMenu extends DynamicMenu {
 
         registerMainItem(1, 1, (player, user) -> Locales.getItem(player, "other.iep")
                         .click(event -> event.getPlayer().performCommand("iep play")),
-                player -> Bukkit.getPluginManager().isPluginEnabled("IEP"));
+                // elytra parkour is bundled in this jar now, so there is no separate "IEP" plugin to look for
+                player -> IP.getPlugin() != null && IP.getPlugin().isElytraEnabled());
 
         registerMainItem(1, 6, (player, user) -> Locales.getItem(player, "play.spectator.item")
                         .click(event -> Menus.SPECTATOR.open(event.getPlayer())),

@@ -22,6 +22,9 @@ public class InventoryData {
     private final Player player;
     private Map<Integer, ItemStack> items = new HashMap<>();
 
+    private final Object fileLock = new Object();
+    private boolean applied = false;
+
     public InventoryData(Player player) {
         this.player = player;
         this.file = IP.getInFolder("inventories/%s".formatted(player.getUniqueId()));
@@ -33,6 +36,16 @@ public class InventoryData {
     public void apply() {
         player.getInventory().clear();
         items.forEach((slot, item) -> player.getInventory().setItem(slot, item));
+
+        // the backup is only meant for crash recovery; once restored it is stale and
+        // recovering it again later would duplicate items. The lock and flag stop a still
+        // running async save from writing the backup again after this delete.
+        synchronized (fileLock) {
+            applied = true;
+            if (file.exists() && !file.delete()) {
+                IP.logging().warn("Could not delete restored inventory backup %s".formatted(file.getName()));
+            }
+        }
     }
 
     /**
@@ -89,6 +102,14 @@ public class InventoryData {
     }
 
     private void saveFile() {
+        synchronized (fileLock) {
+            if (!applied) {
+                writeFile();
+            }
+        }
+    }
+
+    private void writeFile() {
         try {
             file.getParentFile().mkdirs();
             file.createNewFile();

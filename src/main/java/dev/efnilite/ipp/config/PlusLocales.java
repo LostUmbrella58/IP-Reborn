@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -30,7 +31,9 @@ public class PlusLocales {
 
     // a map of all locales with their respective json trees
     // the json trees are stored instead of the files to avoid having to read the files every time
-    private static final Map<String, FileConfiguration> locales = new HashMap<>();
+    private static final Map<String, FileConfiguration> locales = new ConcurrentHashMap<>();
+    // every locale bundled under resources/plus/locales
+    private static final String[] BUNDLED_LOCALES = {"en", "nl", "fr", "zh_cn", "jp"};
     // a list of all nodes
     // used to check against missing nodes
     private static List<String> resourceNodes;
@@ -47,13 +50,12 @@ public class PlusLocales {
 
                     Path folder = IPP.getDataFolder().toPath().resolve("locales");
 
-                    // download files to locales folder
-                    if (!folder.toFile().exists()) {
-                        folder.toFile().mkdirs();
-
-                        IPP.getPlugin().saveResource("plus/locales/en.yml", false);
-                        IPP.getPlugin().saveResource("plus/locales/nl.yml", false);
-                        IPP.getPlugin().saveResource("plus/locales/fr.yml", false);
+                    // extract every bundled locale that is missing, also when the folder already exists (e.g. migrated)
+                    folder.toFile().mkdirs();
+                    for (String bundled : BUNDLED_LOCALES) {
+                        if (!folder.resolve(bundled + ".yml").toFile().exists()) {
+                            IPP.getPlugin().saveResource("plus/locales/%s.yml".formatted(bundled), false);
+                        }
                     }
 
                     // get all files in locales folder
@@ -97,6 +99,29 @@ public class PlusLocales {
         }
     }
 
+    /**
+     * Resolves a locale, falling back to the configured default locale, then English, then the embedded resource.
+     *
+     * @param locale The requested locale. May be null.
+     * @return The locale file, or null if nothing has been loaded yet.
+     */
+    private static FileConfiguration resolve(String locale) {
+        FileConfiguration base = locale == null ? null : locales.get(locale);
+
+        if (base == null) {
+            String defaultLang = Option.OPTIONS_DEFAULTS.get(ParkourOption.LANG);
+            base = defaultLang == null ? null : locales.get(defaultLang);
+        }
+        if (base == null) {
+            base = locales.get("en");
+        }
+        if (base == null) {
+            base = defaultResource;
+        }
+
+        return base;
+    }
+
     private static List<String> getChildren(FileConfiguration file) {
         ConfigurationSection section = file.getConfigurationSection("");
         return section != null ? new ArrayList<>(section.getKeys(true)) : Collections.emptyList();
@@ -127,20 +152,13 @@ public class PlusLocales {
      * @return a coloured String
      */
     public static String getString(String locale, String path, boolean colour) {
-        FileConfiguration base = locales.get(locale);
+        FileConfiguration base = resolve(locale);
 
-        if (base == null) {
-            String defaultLang = Option.OPTIONS_DEFAULTS.get(ParkourOption.LANG);
+        String string = base == null ? null : base.getString(path);
 
-            if (defaultLang == null) {
-                IPP.logging().stack("No default language found", "check your config for an incorrect lang default value");
-                return "";
-            }
-
-            base = locales.get(defaultLang);
+        if (string == null && defaultResource != null) {
+            string = defaultResource.getString(path);
         }
-
-        String string = base.getString(path);
 
         if (string == null) {
             IPP.logging().stack("Invalid config path: " + path, "contact the developer");
@@ -178,14 +196,8 @@ public class PlusLocales {
      */
     @NotNull
     public static Item getItem(String locale, String path, String... replace) {
-        final FileConfiguration base;
-
-        if (locales.containsKey(locale)) {
-            base = locales.get(locale);
-        } else {
-            IPP.logging().warn("Unknown locale: " + locale + ", switching to default English embedded resource");
-            base = defaultResource;
-        }
+        FileConfiguration resolved = resolve(locale);
+        final FileConfiguration base = resolved != null ? resolved : new YamlConfiguration();
 
         String material = base.getString(path + ".material");
         String name = base.getString(path + ".name");

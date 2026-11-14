@@ -4,8 +4,10 @@ import dev.efnilite.ip.config.Option;
 import dev.efnilite.ip.leaderboard.Score;
 import dev.efnilite.ip.player.ParkourPlayer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -32,9 +34,9 @@ public class Storage {
      * Reads scores.
      *
      * @param mode The mode.
-     * @return Map with all scores, unsorted.
+     * @return Map with all scores, unsorted. Null if reading failed, in which case the caller should keep its current data.
      */
-    public static @NotNull Map<UUID, Score> readScores(@NotNull String mode) {
+    public static @Nullable Map<UUID, Score> readScores(@NotNull String mode) {
         if (Option.SQL) {
             return StorageSQL.readScores(mode);
         } else {
@@ -45,14 +47,19 @@ public class Storage {
     /**
      * Writes scores.
      *
-     * @param mode   The mode.
-     * @param scores The score map.
+     * @param mode    The mode.
+     * @param scores  The score map. Not modified.
+     * @param removed Players whose scores have been reset and should be deleted from storage.
+     * @param changed Scores changed since the last save. MySQL only writes these; disk writes the whole map.
+     * @return True if writing succeeded.
      */
-    public static void writeScores(@NotNull String mode, @NotNull Map<UUID, Score> scores) {
+    public static boolean writeScores(@NotNull String mode, @NotNull Map<UUID, Score> scores, @NotNull Set<UUID> removed,
+                                      @NotNull Map<UUID, Score> changed) {
         if (Option.SQL) {
-            StorageSQL.writeScores(mode, scores);
+            // MySQL keeps every row, so only the scores changed since the last save need writing
+            return StorageSQL.writeScores(mode, changed, removed);
         } else {
-            StorageDisk.writeScores(mode, scores);
+            return StorageDisk.writeScores(mode, scores);
         }
     }
 

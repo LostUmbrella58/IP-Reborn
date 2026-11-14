@@ -37,11 +37,10 @@ public abstract class ViCommand implements CommandExecutor, TabCompleter {
      * @return false if the cooldown is not over yet, true if it has been.
      */
     protected boolean cooldown(CommandSender sender, String arg, long cooldownMs) {
-        if (sender instanceof ConsoleCommandSender) { // ignore console (has no UUID)
+        if (!(sender instanceof Player player)) { // ignore console, rcon, command blocks etc. (no UUID)
             return true;
         }
 
-        Player player = (Player) sender;
         UUID uuid = player.getUniqueId();
 
         CommandCooldown cooldown; // the current cooldown

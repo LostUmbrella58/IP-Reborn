@@ -78,6 +78,15 @@ public class Events implements EventWatcher {
         Player player = event.getPlayer();
 
         if (Config.CONFIG.getBoolean("bungeecord.enabled")) {
+            // Put back a crash-time elytra parkour state first, so block parkour saves the
+            // player's real inventory instead of the elytra hotbar.
+            if (IP.getPlugin().isElytraEnabled()) {
+                try {
+                    dev.efnilite.iep.player.PreviousData.Companion.restoreLeftover(player);
+                } catch (Throwable t) {
+                    IP.logging().stack("Error while restoring elytra parkour data for %s".formatted(player.getName()), t);
+                }
+            }
             Modes.DEFAULT.create(player);
             return;
         }
@@ -139,6 +148,9 @@ public class Events implements EventWatcher {
         // 检查是否是副手点击
         if (event.getHand() != EquipmentSlot.OFF_HAND) return;
 
+        // 只限制正在跑酷的玩家，不影响服务器其他地方
+        if (!ParkourUser.isUser(player)) return;
+
         // 获取副手物品
         ItemStack offHandItem = player.getInventory().getItem(EquipmentSlot.OFF_HAND);
 
@@ -179,6 +191,10 @@ public class Events implements EventWatcher {
 
                 Command.selections.put(player, new Location[]{location, existingSelection[1]});
 
+                if (existingSelection[1] == null) {
+                    return;
+                }
+
                 Particles.box(BoundingBox.of(location, existingSelection[1]), player.getWorld(), new ParticleData<>(Particle.END_ROD, null, 2), player, 0.2);
             }
             case RIGHT_CLICK_BLOCK -> {
@@ -190,6 +206,10 @@ public class Events implements EventWatcher {
                 }
 
                 Command.selections.put(player, new Location[]{existingSelection[0], location});
+
+                if (existingSelection[0] == null) {
+                    return;
+                }
 
                 Particles.box(BoundingBox.of(existingSelection[0], location), player.getWorld(), new ParticleData<>(Particle.END_ROD, null, 2), player, 0.2);
             }

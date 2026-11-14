@@ -17,6 +17,7 @@ import dev.efnilite.ipp.IPP;
 import dev.efnilite.ipp.config.PlusConfigOption;
 import dev.efnilite.ipp.config.PlusLocales;
 import dev.efnilite.ipp.mode.PlusMode;
+import dev.efnilite.ipp.util.PlusLogic;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -43,6 +44,8 @@ public final class DuelsGenerator extends MultiplayerGenerator {
     private final ParkourPlayer owner;
     public final Map<ParkourPlayer, SingleDuelsGenerator> playerGenerators = new HashMap<>();
     private final Map<ParkourPlayer, SpawnData> spawnData = new HashMap<>();
+    // stable island/colour slot per player, so a leaving player's slot can be reused without overlap
+    private final Map<ParkourPlayer, Integer> slots = new HashMap<>();
     public final int goal = IPP.getConfiguration().getFile("config").getInt("gamemodes.%s.goal".formatted(getMode().getName().toLowerCase()));
 
     public DuelsGenerator(@NotNull Session session) {
@@ -75,13 +78,18 @@ public final class DuelsGenerator extends MultiplayerGenerator {
         generator.player = player;
         generator.owningGenerator = this;
 
-        generator.setPlayerIndex(playerGenerators.size());
+        int slot = PlusLogic.lowestFreeSlot(slots.values());
+        generator.setPlayerIndex(slot);
 
         // setup where:
         // - schematic gets pasted
         // - player gets teleported
         // - block starts generating
-        Location spawn = playerSpawn.clone().add(0, 0, (SCHEMATIC.getDimensions().getX() + PlusConfigOption.DUELS_ISLAND_DISTANCE) * (getPlayers().size() - 1));
+        // getDimensions() is max - min, so the island is one block wider than that. The
+        // larger horizontal extent keeps the spacing at least what it was before, and
+        // island_distance is the gap between island edges (0 = touching, never overlapping).
+        double islandWidth = Math.max(SCHEMATIC.getDimensions().getX(), SCHEMATIC.getDimensions().getZ()) + 1;
+        Location spawn = playerSpawn.clone().add(0, 0, (islandWidth + PlusConfigOption.DUELS_ISLAND_DISTANCE) * slot);
         List<Block> blocks = SCHEMATIC.paste(spawn);
 
         Location playerSpawn = null;
@@ -104,6 +112,7 @@ public final class DuelsGenerator extends MultiplayerGenerator {
         }
         generator.island.blocks = blocks;
 
+        slots.put(player, slot);
         spawnData.put(player, new SpawnData(playerSpawn, blockSpawn));
         playerGenerators.put(player, generator);
         player.updateScoreboard(generator);
@@ -120,13 +129,22 @@ public final class DuelsGenerator extends MultiplayerGenerator {
         generator.reset(false);
 
         playerGenerators.remove(player);
+        slots.remove(player);
+        spawnData.remove(player);
 
         if (allowJoining && player == owner) {
+            // the owner is leaving: move every other player out, never re-create anything for the owner
             for (ParkourPlayer other : new HashSet<>(playerGenerators.keySet())) {
-                ParkourUser.unregister(other, true, true, false);
+                if (PlusConfigOption.SEND_BACK_AFTER_MULTIPLAYER) {
+                    ParkourUser.unregister(other, true, true, false);
+                } else {
+                    Modes.DEFAULT.create(other.player);
 
-                if (!PlusConfigOption.SEND_BACK_AFTER_MULTIPLAYER) {
-                    Modes.DEFAULT.create(player.player);
+                    // default mode may refuse (e.g. joining disabled); never leave them in this dead lobby
+                    ParkourPlayer still = ParkourPlayer.getPlayer(other.player);
+                    if (still != null && still.session == session) {
+                        ParkourUser.unregister(still, true, true, false);
+                    }
                 }
             }
             return;
@@ -205,7 +223,7 @@ public final class DuelsGenerator extends MultiplayerGenerator {
             return;
         }
 
-        playerGenerators.keySet().forEach(this::removePlayer);
+        new HashSet<>(playerGenerators.keySet()).forEach(this::removePlayer);
     }
 
     @Override

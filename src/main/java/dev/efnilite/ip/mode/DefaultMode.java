@@ -1,5 +1,6 @@
 package dev.efnilite.ip.mode;
 
+import dev.efnilite.ip.IP;
 import dev.efnilite.ip.config.Config;
 import dev.efnilite.ip.config.Locales;
 import dev.efnilite.ip.generator.ParkourGenerator;
@@ -38,6 +39,12 @@ public class DefaultMode implements Mode {
 
     @Override
     public void create(Player player) {
+        // never start new sessions while the plugin is shutting down (e.g. spectators being
+        // moved into a game when the last player of their session leaves during onDisable)
+        if (!IP.getPlugin().isEnabled()) {
+            return;
+        }
+
         if (!Config.CONFIG.getBoolean("joining")) {
             player.sendMessage("Joining is currently disabled.");
             return;

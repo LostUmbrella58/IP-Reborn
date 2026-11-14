@@ -12,7 +12,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.NotNull;
@@ -29,22 +32,51 @@ import java.util.stream.IntStream;
 @SuppressWarnings("unused")
 public class Menu implements EventWatcher {
 
-    private final static Map<UUID, UUID> openMenus = new HashMap<>();
-    private final static List<Menu> disabledMenus = new ArrayList<>();
+    /**
+     * The menu each player currently has open. Only accessed on the main thread.
+     */
+    private final static Map<UUID, Menu> openMenus = new HashMap<>();
 
     private static Plugin plugin;
 
     public static void init(Plugin pl) {
-        Task.create(pl).repeat(5 * 20).execute(() -> {
-            if (openMenus.keySet().isEmpty()) {
-                for (Menu menu : disabledMenus) {
-                    menu.unregisterAll();
-                }
-                disabledMenus.clear();
-            }
-        }).run();
-
         plugin = pl;
+    }
+
+    /**
+     * Closes every open menu and unregisters its listener.
+     * Call this on plugin disable, so players can't take items out of menus that are no longer protected.
+     */
+    public static void closeAll() {
+        for (Menu menu : new ArrayList<>(openMenus.values())) {
+            Player viewer = menu.player;
+
+            if (viewer != null && viewer.isOnline() && menu.isViewing(viewer)) {
+                viewer.closeInventory(); // listeners of a disabling plugin may not fire, so deactivate below
+            }
+
+            menu.deactivate();
+        }
+
+        openMenus.clear();
+    }
+
+    /**
+     * Holder used to recognise inventories that belong to a menu.
+     */
+    private static final class MenuHolder implements InventoryHolder {
+
+        private final Menu menu;
+        private Inventory inventory;
+
+        private MenuHolder(Menu menu) {
+            this.menu = menu;
+        }
+
+        @Override
+        public @NotNull Inventory getInventory() {
+            return inventory;
+        }
     }
 
     protected final int rows;
@@ -55,6 +87,7 @@ public class Menu implements EventWatcher {
     protected UUID inventoryId;
     protected Player player;
     protected Material filler = null;
+    protected Inventory inventory;
 
     public Menu(int rows, String name) {
         if (rows < 1 || rows > 6) {
@@ -147,7 +180,7 @@ public class Menu implements EventWatcher {
      * @param slots The slots which are to be updated
      */
     public void updateItem(int... slots) {
-        Inventory inventory = player.getOpenInventory().getTopInventory();
+        Inventory inventory = getInventory();
 
         if (inventory.getSize() % 9 != 0) {
             throw new IllegalArgumentException("Invalid inventory type");
@@ -162,7 +195,7 @@ public class Menu implements EventWatcher {
      * Updates all items in the inventory
      */
     public void update() {
-        Inventory inventory = player.getOpenInventory().getTopInventory();
+        Inventory inventory = getInventory();
 
         if (inventory.getSize() % 9 != 0) {
             throw new IllegalArgumentException("Invalid inventory type");
@@ -205,7 +238,9 @@ public class Menu implements EventWatcher {
      */
     public void open(Player player) {
         this.player = player;
-        Inventory inventory = Bukkit.createInventory(null, rows * 9, title);
+        MenuHolder holder = new MenuHolder(this);
+        Inventory inventory = Bukkit.createInventory(holder, rows * 9, title);
+        holder.inventory = inventory;
 
         // Evenly distributed rows
         for (int row : evenlyDistributedRows) {
@@ -257,50 +292,113 @@ public class Menu implements EventWatcher {
         }
 
 
-        player.openInventory(inventory);
-        openMenus.put(player.getUniqueId(), inventoryId);
-
         items.forEach((slot, item) -> inventory.setItem(slot, item.build()));
 
+        // in case this instance is reopened, never register twice
+        unregisterAll();
+        this.inventory = inventory;
+        this.deactivated = false;
+
+        player.openInventory(inventory);
+
+        // opening may be refused, e.g. by another plugin cancelling InventoryOpenEvent
+        if (!isViewing(player)) {
+            deactivated = true;
+            return;
+        }
+
+        openMenus.put(player.getUniqueId(), this);
         register(plugin);
+    }
+
+    /**
+     * @return the inventory of this menu, or the player's open top inventory if this menu hasn't been opened yet.
+     */
+    private Inventory getInventory() {
+        return inventory != null ? inventory : player.getOpenInventory().getTopInventory();
+    }
+
+    private boolean isMenuInventory(@Nullable Inventory inventory) {
+        return inventory != null && inventory.getHolder(false) instanceof MenuHolder holder && holder.menu == this;
+    }
+
+    private boolean isViewing(Player viewer) {
+        return isMenuInventory(viewer.getOpenInventory().getTopInventory());
+    }
+
+    private void deactivate() {
+        deactivated = true;
+        unregisterAll();
+
+        if (player != null) {
+            openMenus.remove(player.getUniqueId(), this);
+        }
     }
 
     @EventHandler
     public void click(@NotNull InventoryClickEvent event) {
-        if (deactivated || event.getClickedInventory() != event.getView().getTopInventory()) {
+        Inventory top = event.getView().getTopInventory();
+        if (deactivated || !isMenuInventory(top)) {
             return;
         }
 
-        UUID id = openMenus.get(event.getWhoClicked().getUniqueId());
-        if (id != inventoryId) {
+        Inventory clicked = event.getClickedInventory();
+        if (clicked == null) { // outside the window, only affects the cursor
             return;
         }
 
+        if (!isMenuInventory(clicked)) {
+            // bottom inventory: block everything that could move items into or out of the menu
+            switch (event.getAction()) {
+                case MOVE_TO_OTHER_INVENTORY, COLLECT_TO_CURSOR, UNKNOWN -> event.setCancelled(true);
+                default -> {}
+            }
+            return;
+        }
+
+        // default-deny: only movable items may be moved
         MenuItem clickedItem = items.get(event.getSlot());
+        event.setCancelled(clickedItem == null || !clickedItem.isMovable());
+
         if (clickedItem == null) {
             return;
         }
-
-        event.setCancelled(!clickedItem.isMovable());
 
         clickedItem.handleClick(this, event, event.getClick());
     }
 
     @EventHandler
+    public void drag(@NotNull InventoryDragEvent event) {
+        Inventory top = event.getView().getTopInventory();
+        if (deactivated || !isMenuInventory(top)) {
+            return;
+        }
+
+        int topSize = top.getSize();
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot < topSize) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
+
+    @EventHandler
     public void close(InventoryCloseEvent event) {
-        if (deactivated) {
+        if (deactivated || !isMenuInventory(event.getInventory())) {
             return;
         }
 
-        UUID viewerId = event.getPlayer().getUniqueId();
-        UUID id = openMenus.get(viewerId);
-        if (id != inventoryId) {
+        deactivate();
+    }
+
+    @EventHandler
+    public void quit(PlayerQuitEvent event) {
+        if (deactivated || player == null || !event.getPlayer().getUniqueId().equals(player.getUniqueId())) {
             return;
         }
 
-        deactivated = true;
-        disabledMenus.add(this);
-        openMenus.remove(viewerId);
+        deactivate();
     }
 
     /**

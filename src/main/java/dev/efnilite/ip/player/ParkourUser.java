@@ -62,6 +62,7 @@ public abstract class ParkourUser {
             unregister(existing, false, false, false);
         } else {
             IP.log("Registering player %s".formatted(player.getName()));
+            leaveElytraParkour(player);
         }
         ParkourPlayer pp = new ParkourPlayer(player, session, data);
 
@@ -94,6 +95,24 @@ public abstract class ParkourUser {
      */
     public static void leave(@NotNull ParkourUser user) {
         unregister(user, true, true, false);
+    }
+
+    /**
+     * Takes the player out of elytra parkour first, so its saved state is restored before
+     * block parkour captures the player's state. Otherwise both would restore their own copy.
+     */
+    private static void leaveElytraParkour(@NotNull Player player) {
+        if (!IP.getPlugin().isElytraEnabled()) {
+            return;
+        }
+        try {
+            var elytraPlayer = dev.efnilite.iep.player.ElytraPlayer.Companion.asElytraPlayer(player);
+            if (elytraPlayer != null) {
+                elytraPlayer.leaveForBlockParkour();
+            }
+        } catch (Throwable t) {
+            IP.logging().stack("Error while taking %s out of elytra parkour".formatted(player.getName()), t);
+        }
     }
 
     /**
@@ -167,7 +186,7 @@ public abstract class ParkourUser {
      */
     public static @Nullable ParkourUser getUser(@NotNull Player player) {
         return getUsers().stream()
-                .filter(other -> other.getUUID() == player.getUniqueId())
+                .filter(other -> other.getUUID().equals(player.getUniqueId()))
                 .findAny()
                 .orElse(null);
     }

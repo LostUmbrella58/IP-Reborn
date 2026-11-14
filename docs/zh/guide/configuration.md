@@ -21,6 +21,7 @@
 
 `plugins/IP/config.yml` 的主要部分：
 
+- `update-checker`：启动时检查 Spigot 上是否有新版本，只有确实有新版本时才在日志里提示。设为 `false` 则不检查。
 - `joining`：是否允许玩家加入方块跑酷。
 - `bungeecord`：自动加入、返回服务器和非代理返回坐标。
 - `sql`：MySQL 地址、端口、账号、数据库和表前缀。

@@ -8,6 +8,7 @@ import dev.efnilite.iep.config.Locales
 import dev.efnilite.iep.hook.ChunkyHook
 import dev.efnilite.iep.hook.PapiHook
 import dev.efnilite.iep.mode.*
+import dev.efnilite.iep.player.PreviousData
 import dev.efnilite.iep.style.IncrementalStyle
 import dev.efnilite.iep.style.RandomStyle
 import dev.efnilite.iep.style.Style
@@ -17,6 +18,7 @@ import dev.efnilite.ip.foundation.schematic.Schematics
 import dev.efnilite.ip.foundation.util.Logging
 import dev.efnilite.ip.foundation.util.Task
 import org.bukkit.Material
+import org.bukkit.scheduler.BukkitTask
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -76,16 +78,18 @@ object IEP {
             plugin.server.messenger.registerOutgoingPluginChannel(plugin, "BungeeCord")
         }
         
-        Task.create(plugin)
+        autosave = Task.create(plugin)
             .async()
             .repeat(5 * 60 * 20)
             .delay(5 * 60 * 20)
             .execute {
                 log("Saving all leaderboards")
-                modes.forEach { it.leaderboard.save() }
+                getModes().forEach { it.leaderboard.save() }
             }
             .run()
 
+        // Players already online (e.g. after a reload) never fire PlayerJoinEvent.
+        plugin.server.onlinePlayers.forEach { PreviousData.restoreLeftover(it) }
     }
 
     fun saveFile(path: String) {
@@ -115,21 +119,43 @@ object IEP {
     fun disable() {
         stopping = true
 
+        // Each step is isolated so one failure (one player's restore, one leaderboard)
+        // can't skip the rest. Anything a failed restore leaves behind is still covered
+        // by the crash-restore file on the player's next login.
+        try { autosave?.cancel() } catch (_: Throwable) {}
+        autosave = null
+
         try {
             papiHook?.unregister()
-            papiHook = null
+        } catch (t: Throwable) {
+            logging.stack("Error while unregistering the elytra PlaceholderAPI hook", t)
+        }
+        papiHook = null
 
-            for (generator in HashSet(Divider.generators)) {
+        for (generator in HashSet(Divider.generators)) {
+            try {
                 generator.player.leave(urgent = true)
+            } catch (t: Throwable) {
+                logging.stack("Error while removing a player from elytra parkour on disable", t)
             }
+        }
 
-            getModes().forEach { it.leaderboard.save() }
+        for (mode in getModes()) {
+            try {
+                mode.leaderboard.save()
+            } catch (t: Throwable) {
+                logging.stack("Error while saving the ${mode.name} leaderboard", t)
+            }
+        }
 
+        try {
             World.delete()
-        } catch (_: Exception) {
-            // for no class found errors if nobody has joined yet
+        } catch (t: Throwable) {
+            logging.stack("Error while deleting the elytra parkour world", t)
         }
     }
+
+    private var autosave: BukkitTask? = null
 
     var stopping = false
         private set

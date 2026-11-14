@@ -2,6 +2,7 @@ package dev.efnilite.ip.menu.lobby;
 
 import dev.efnilite.ip.config.Locales;
 import dev.efnilite.ip.menu.Menus;
+import dev.efnilite.ip.menu.ParkourOption;
 import dev.efnilite.ip.mode.Modes;
 import dev.efnilite.ip.player.ParkourPlayer;
 import dev.efnilite.ip.player.ParkourUser;
@@ -31,7 +32,7 @@ public class PlayerManagementMenu {
 
         ParkourPlayer viewer = ParkourPlayer.getPlayer(p);
 
-        if (viewer == null) {
+        if (!mayManage(viewer)) {
             return;
         }
 
@@ -46,6 +47,11 @@ public class PlayerManagementMenu {
                 .nextPage(26, new Item(Material.LIME_DYE, "<#0DCB07><bold>»").click(event -> menu.page(1)))
                 .item(22, Locales.getItem(viewer.locale, "other.close").click(event -> Menus.LOBBY.open(event.getPlayer())))
                 .open(p);
+    }
+
+    // whether this player may manage the players of their session
+    private static boolean mayManage(ParkourUser viewer) {
+        return viewer instanceof ParkourPlayer && ParkourOption.PLAYER_MANAGEMENT.mayPerform(viewer.player) && viewer.session.isOwner(viewer);
     }
 
     private void add(PagedMenu menu, ParkourUser viewer, Collection<ParkourUser> users) {
@@ -72,6 +78,13 @@ public class PlayerManagementMenu {
 
             // Player head gathering
             item.material(Material.PLAYER_HEAD).lore(lore).click(event -> {
+                // the menu may be stale: re-check that the viewer still manages this session and the target is still in it
+                if (!mayManage(viewer) || viewer.session != session || !other.player.isOnline()
+                        || !session.getUsers().contains(other) || ParkourUser.getUser(other.player) != other) {
+                    event.getPlayer().closeInventory();
+                    return;
+                }
+
                 ClickType click = event.event().getClick();
 
                 switch (click) {

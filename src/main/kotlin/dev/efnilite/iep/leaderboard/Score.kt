@@ -16,8 +16,12 @@ data class Score(val name: String, val score: Double, val time: Long, val seed: 
 
     companion object {
 
-        val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern(Config.CONFIG.getString("time-format"))
-            .withZone(ZoneOffset.UTC)
+        // Lazy so constructing a Score (e.g. while parsing a leaderboard file) doesn't
+        // require the config to be loaded.
+        val timeFormatter: DateTimeFormatter by lazy {
+            DateTimeFormatter.ofPattern(Config.CONFIG.getString("time-format"))
+                .withZone(ZoneOffset.UTC)
+        }
 
         fun Double.pretty(digits: Int = 1) = "%.${digits}f".format(this)
 

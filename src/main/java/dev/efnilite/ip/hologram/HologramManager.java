@@ -223,9 +223,17 @@ public final class HologramManager implements Listener {
             // The Display entity should always be valid. If it's gone for any reason
             // (someone /kill'd it, world reload, force chunk unload that beat our ticket),
             // re-spawn from config.
-            if (h.isDestroyed()) {
-                IP.log("Hologram '%s' marked destroyed during sanity check — respawning".formatted(e.getKey()));
-                spawnHologram(h.config());
+            if (!h.isHealthy()) {
+                IP.log("Hologram '%s' entities missing during sanity check — respawning".formatted(e.getKey()));
+                try {
+                    spawnHologram(h.config());
+                } catch (Throwable t) {
+                    // e.g. the host world was unloaded; try again on the next sanity check
+                    IP.logging().warn("Failed to respawn hologram '%s': %s".formatted(e.getKey(), t));
+                }
+                // spawnHologram drops the old tracker before respawning; if the respawn failed keep
+                // the (destroyed) tracker so the next sanity check retries instead of forgetting it.
+                active.putIfAbsent(e.getKey(), h);
             }
         }
     }

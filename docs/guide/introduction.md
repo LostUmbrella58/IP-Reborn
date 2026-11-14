@@ -17,7 +17,7 @@ All generated data lives under `plugins/IP/`. Multiplayer files use `plugins/IP/
 - Configurable random and incremental block styles.
 - Elytra modes with configurable seeds, radius, speed, obstacles, and time trials.
 - Local or MySQL storage, rewards, leaderboards, PlaceholderAPI placeholders, and optional integrations.
-- English, French, Japanese, Dutch, and Simplified Chinese locales for block parkour. Locale availability differs slightly for multiplayer and elytra menus.
+- English, French, Japanese, Dutch, and Simplified Chinese locales for block parkour and multiplayer modes; English, Dutch, and Simplified Chinese for elytra parkour.
 
 ## Where to go next
 

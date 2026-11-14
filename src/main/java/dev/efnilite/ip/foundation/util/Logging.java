@@ -72,7 +72,7 @@ public class Logging {
         // Both return the same version string, so fall through to the legacy call on
         // older API surfaces (e.g. when vilib is used on a Spigot/Bukkit derivative).
         error("##\tPlugin Version: %s".formatted(getPluginVersion()));
-        error("##\tMinecraft: %s".formatted(Version.getVersion()));
+        error("##\tMinecraft: %s".formatted(Version.getPrettyVersion()));
         error("##");
     }
 

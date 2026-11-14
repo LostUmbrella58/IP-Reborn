@@ -20,7 +20,7 @@ public final class LobbyMode implements Mode {
             return;
         }
 
-        if (Lobby.getSelections().isEmpty() || !Lobby.getSelections().containsKey(player.getWorld())) {
+        if (Lobby.getSelections().get(player.getWorld()) == null) {
             return;
         }
 

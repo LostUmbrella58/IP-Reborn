@@ -73,6 +73,12 @@ public class ParkourPlayer extends ParkourUser {
     public @Expose String style;
     public @Expose String _locale;
     public @Expose List<String> collectedRewards;
+
+    /**
+     * True when the stored settings couldn't be read (e.g. MySQL was unreachable) and defaults
+     * were used instead. These defaults must not be saved over the player's real data.
+     */
+    public transient boolean settingsUnavailable = false;
     /**
      * Creates a new instance of a ParkourPlayer<br>
      * If you are using the API, please use {@link ParkourPlayer#register(Player, Session)} instead
@@ -112,7 +118,7 @@ public class ParkourPlayer extends ParkourUser {
      */
     public static @Nullable ParkourPlayer getPlayer(@NotNull Player player) {
         return getPlayers().stream()
-                .filter(other -> other.getUUID() == player.getUniqueId())
+                .filter(other -> other.getUUID().equals(player.getUniqueId()))
                 .findAny()
                 .orElse(null);
     }
@@ -208,6 +214,11 @@ public class ParkourPlayer extends ParkourUser {
         // -= Inventory =-
         if (Config.CONFIG.getBoolean("options.inventory-handling")) {
             Task.create(IP.getPlugin()).delay(5).execute(() -> {
+                // the player may have left (and had their inventory restored) within these 5 ticks
+                if (!player.isOnline() || ParkourUser.getUser(player) != this) {
+                    return;
+                }
+
                 IP.log("Setting up inventory for player %s".formatted(player.getName()));
 
                 player.getInventory().clear();

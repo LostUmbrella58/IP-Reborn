@@ -19,7 +19,7 @@ public class LobbyMenu extends DynamicMenu {
         registerMainItem(1, 0, (player, user) -> Locales.getItem(player, "lobby.player_management.item").click(event -> Menus.PLAYER_MANAGEMENT.open(player)), player -> {
             ParkourUser user = ParkourUser.getUser(player);
 
-            return ParkourOption.PLAYER_MANAGEMENT.mayPerform(player) && user instanceof ParkourPlayer && user.session.getPlayers().get(0) == user;
+            return ParkourOption.PLAYER_MANAGEMENT.mayPerform(player) && user instanceof ParkourPlayer && user.session.isOwner(user);
         });
 
         registerMainItem(1, 1, (player, user) -> {
@@ -36,7 +36,7 @@ public class LobbyMenu extends DynamicMenu {
             }).add(0, Locales.getItem(player, "lobby.visibility").modifyLore(lore -> lore.replace("%s", values.get(2))), event -> { // public
                 ParkourUser u = ParkourUser.getUser(event.getPlayer());
 
-                if (u != null) {
+                if (mayChangeVisibility(u)) {
                     u.session.setVisibility(Session.Visibility.PUBLIC);
                 }
 
@@ -44,7 +44,7 @@ public class LobbyMenu extends DynamicMenu {
             }).add(1, Locales.getItem(player, "lobby.visibility").modifyLore(lore -> lore.replace("%s", values.get(1))), event -> { // id only
                 ParkourUser u = ParkourUser.getUser(event.getPlayer());
 
-                if (u != null) {
+                if (mayChangeVisibility(u)) {
                     u.session.setVisibility(Session.Visibility.ID_ONLY);
                 }
 
@@ -52,7 +52,7 @@ public class LobbyMenu extends DynamicMenu {
             }).add(2, Locales.getItem(player, "lobby.visibility").modifyLore(lore -> lore.replace("%s", values.get(0))), event -> { // private
                 ParkourUser u = ParkourUser.getUser(event.getPlayer());
 
-                if (u != null) {
+                if (mayChangeVisibility(u)) {
                     u.session.setVisibility(Session.Visibility.PRIVATE);
                 }
 
@@ -61,10 +61,15 @@ public class LobbyMenu extends DynamicMenu {
         }, player -> {
             ParkourUser user = ParkourUser.getUser(player);
 
-            return ParkourOption.VISIBILITY.mayPerform(player) && user instanceof ParkourPlayer && user.session.getPlayers().get(0) == user;
+            return ParkourOption.VISIBILITY.mayPerform(player) && user instanceof ParkourPlayer && user.session.isOwner(user);
         });
 
         registerMainItem(2, 10, (player, user) -> Locales.getItem(player, "other.close").click(event -> event.getPlayer().closeInventory()), player -> true);
+    }
+
+    // re-checked on click, since ownership or permissions may have changed while the menu was open
+    private static boolean mayChangeVisibility(ParkourUser user) {
+        return user != null && ParkourOption.VISIBILITY.mayPerform(user.player) && user.session.isOwner(user);
     }
 
     /**

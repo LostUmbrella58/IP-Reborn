@@ -1,7 +1,9 @@
 package dev.efnilite.iep.generator
 
+import dev.efnilite.iep.generator.section.ClientBlockChanger
 import dev.efnilite.iep.generator.section.PointType
 import dev.efnilite.iep.generator.section.Section
+import org.bukkit.Chunk
 import org.bukkit.Material
 import org.bukkit.util.Vector
 import java.util.concurrent.CompletableFuture
@@ -119,7 +121,19 @@ private enum class Obstacle {
  */
 class ObstacleGenerator : Generator() {
 
-    private val obstacles = mutableMapOf<Int, MutableList<Vector>>()
+    /**
+     * An obstacle waiting to be displayed. Obstacles are generated up to ~375 blocks ahead,
+     * far outside the chunks the client has, and the client silently drops block updates
+     * for chunks it doesn't have. So they're only sent once every chunk they touch has been
+     * sent to the player — which also means [ClientBlockChanger.sendNow] never forces a
+     * far-away chunk to load on the server.
+     */
+    private class PendingObstacle(val points: List<Vector>) {
+        val chunkKeys: Set<Long> = points.map { Chunk.getChunkKey(it.blockX shr 4, it.blockZ shr 4) }.toSet()
+        var shown = false
+    }
+
+    private val obstacles = mutableMapOf<Int, MutableList<PendingObstacle>>()
 
     override fun generate(waitForDisplay: CompletableFuture<Void>) {
         super.generate(waitForDisplay)
@@ -135,18 +149,41 @@ class ObstacleGenerator : Generator() {
         val points = obstacle.getPoints(section.getKnot(knotIdx), settings.radius)
         if (points.isEmpty()) return
 
-        // Render client-side rather than mutating the world. Same visual, no chunk dirty.
-        blockChangerInstance().sendNow(player.player, points, Material.YELLOW_CONCRETE)
+        // Displayed later from tick(), once the client has the chunks.
+        obstacles.getOrPut(idx) { mutableListOf() } += PendingObstacle(points)
+    }
 
-        obstacles.getOrPut(idx) { mutableListOf() }.addAll(points)
+    override fun tick() {
+        super.tick()
+
+        if (isStopped) return
+
+        val bukkit = player.player
+        if (!bukkit.isOnline) return
+
+        for (list in obstacles.values) {
+            for (obstacle in list) {
+                if (obstacle.shown || !obstacle.chunkKeys.all { bukkit.isChunkSent(it) }) continue
+
+                // Render client-side rather than mutating the world. Same visual, no chunk dirty.
+                blockChangerInstance().sendNow(bukkit, obstacle.points, Material.YELLOW_CONCRETE)
+                obstacle.shown = true
+            }
+        }
     }
 
     override fun clear(idx: Int, section: Section) {
         super.clear(idx, section)
 
         val list = obstacles.remove(idx) ?: return
-        // Undo the spoofed obstacles — also client-side, no chunk reload.
-        blockChangerInstance().sendNow(player.player, list, Material.AIR)
+        val bukkit = player.player
+
+        // Undo only what was displayed, and only where the client still has the chunk.
+        val shown = list
+            .filter { it.shown && it.chunkKeys.all { key -> bukkit.isChunkSent(key) } }
+            .flatMap { it.points }
+
+        blockChangerInstance().sendNow(bukkit, shown, Material.AIR)
     }
 
     // Generator.blockChanger is private; ObstacleGenerator lives in the same package, so

@@ -42,5 +42,25 @@ data class Settings(val locale: String,
         fun String.asStyle(): Style {
             return IEP.getStyle(this)
         }
+
+        /**
+         * Repairs settings read from storage. Gson bypasses Kotlin's null checks, so an old or
+         * hand-edited file can produce null fields or out-of-range values; those are replaced
+         * with the matching value from [defaults].
+         */
+        @Suppress("USELESS_CAST", "SENSELESS_COMPARISON")
+        fun sanitized(loaded: Settings, defaults: Settings): Settings {
+            return Settings(
+                locale = (loaded.locale as String?) ?: defaults.locale,
+                style = (loaded.style as String?) ?: defaults.style,
+                radius = if (loaded.radius in 3..6) loaded.radius else defaults.radius,
+                time = if (loaded.time in 0..<24000) loaded.time else defaults.time,
+                seed = if (loaded.seed in -1..1_000_000) loaded.seed else defaults.seed,
+                fall = loaded.fall,
+                metric = loaded.metric,
+                info = loaded.info,
+                rewards = (loaded.rewards as MutableSet<Int>?)?.toMutableSet() ?: mutableSetOf()
+            )
+        }
     }
 }

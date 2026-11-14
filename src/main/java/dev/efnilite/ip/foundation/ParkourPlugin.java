@@ -3,6 +3,7 @@ package dev.efnilite.ip.foundation;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.efnilite.ip.foundation.command.ViCommand;
+import dev.efnilite.ip.foundation.inventory.Menu;
 import dev.efnilite.ip.foundation.util.Version;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
@@ -39,6 +40,13 @@ public abstract class ParkourPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // close open menus first, so nothing can be taken out of them once their listeners are gone
+        try {
+            Menu.closeAll();
+        } catch (Throwable t) {
+            getLogger().warning("Failed to close open menus: " + t);
+        }
+
         disable();
 
         HandlerList.unregisterAll(this);
@@ -52,7 +60,7 @@ public abstract class ParkourPlugin extends JavaPlugin {
 
     /**
      * What happens on disable of the plugin inheriting this library.
-     * Disabling will automatically cancel all active tasks and unregister all EventWatchers.
+     * Disabling will automatically close all open menus, cancel all active tasks and unregister all EventWatchers.
      */
     public abstract void disable();
 

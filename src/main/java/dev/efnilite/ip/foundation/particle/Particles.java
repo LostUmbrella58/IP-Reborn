@@ -1,5 +1,6 @@
 package dev.efnilite.ip.foundation.particle;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -11,6 +12,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Does particle stuff
@@ -32,6 +36,11 @@ public class Particles {
             throw new NullPointerException("World is null (Particles#draw)");
         }
 
+        Object safe = safeData(data);
+        if (safe == UNSUPPORTED) {
+            return;
+        }
+
         world.spawnParticle(
                 data.getType(),
                 at,
@@ -40,7 +49,7 @@ public class Particles {
                 data.getOffsetY(),
                 data.getOffsetZ(),
                 data.getSpeed(),
-                safeData(data)
+                safe
         );
     }
 
@@ -48,6 +57,11 @@ public class Particles {
         World world = at.getWorld();
         if (world == null) {
             throw new NullPointerException("World is null (Particles#draw)");
+        }
+
+        Object safe = safeData(data);
+        if (safe == UNSUPPORTED) {
+            return;
         }
 
         player.spawnParticle(
@@ -58,7 +72,7 @@ public class Particles {
                 data.getOffsetY(),
                 data.getOffsetZ(),
                 data.getSpeed(),
-                safeData(data)
+                safe
         );
     }
 
@@ -81,6 +95,9 @@ public class Particles {
         Vector vec = p2.clone().subtract(p1).normalize().multiply(distanceBetween);
 
         Object safe = safeData(data);
+        if (safe == UNSUPPORTED) {
+            return;
+        }
 
         world.spawnParticle(data.getType(), p1.getX(), p1.getY(), p1.getZ(),
                 data.getSize(), data.getOffsetX(), data.getOffsetY(), data.getOffsetZ(), data.getSpeed(), safe);
@@ -203,6 +220,9 @@ public class Particles {
         Vector vec = p2.clone().subtract(p1).normalize().multiply(distanceBetween);
 
         Object safe = safeData(data);
+        if (safe == UNSUPPORTED) {
+            return;
+        }
 
         player.spawnParticle(data.getType(), p1.getX(), p1.getY(), p1.getZ(),
                 data.getSize(), data.getOffsetX(), data.getOffsetY(), data.getOffsetZ(), data.getSpeed(), safe);
@@ -235,6 +255,9 @@ public class Particles {
         double y = location.getY();
 
         Object safe = safeData(data);
+        if (safe == UNSUPPORTED) {
+            return;
+        }
 
         for (int i = 0; i < amount; i++) {
             double angle = i * increment;
@@ -250,6 +273,9 @@ public class Particles {
         double y = location.getY();
 
         Object safe = safeData(data);
+        if (safe == UNSUPPORTED) {
+            return;
+        }
 
         for (int i = 0; i < amount; i++) {
             double angle = i * increment;
@@ -263,41 +289,59 @@ public class Particles {
     // =========================
     // Internal: safe data maker
     // =========================
+
+    /**
+     * Returned by {@link #safeData(ParticleData)} when no data can be made for the particle type.
+     * Callers skip spawning in that case.
+     */
+    private static final Object UNSUPPORTED = new Object();
+    private static final Set<Particle> WARNED = ConcurrentHashMap.newKeySet();
+
     private static <T> Object safeData(@NotNull ParticleData<T> data) {
         Particle type = data.getType();
         Class<?> required = type.getDataType();
         Object provided = data.getData();
 
-        // 不需要数据
+        // no data needed
         if (required == Void.class) {
             return null;
         }
 
-        // 已提供且类型正确
+        // provided with the right type
         if (provided != null && required.isInstance(provided)) {
             return provided;
         }
 
-        // —— 根据需要的数据类型做兜底 —— //
-        // SPELL
-        // 替换 safeData(...) 中对 SPELL 的兜底：
+        // fallbacks based on the required type
         if (required == Particle.Spell.class) {
-            // 颜色自定；power 建议 1.0f 左右（太大会更亮更浓）
             return new Particle.Spell(Color.fromRGB(0x33CCFF), 1.0f);
         }
 
-        // REDSTONE
         if (required == Particle.DustOptions.class) {
             return new Particle.DustOptions(Color.fromRGB(0x33CCFF), 1.0f);
         }
 
-        // DUST_COLOR_TRANSITION
         if (required == Particle.DustTransition.class) {
             return new Particle.DustTransition(
                     Color.fromRGB(0x33CCFF),
                     Color.fromRGB(0xFFFFFF),
                     1.0f
             );
+        }
+
+        // ENTITY_EFFECT, TINTED_LEAVES, FLASH, ...
+        if (required == Color.class) {
+            return Color.WHITE;
+        }
+
+        // SCULK_CHARGE (roll angle)
+        if (required == Float.class) {
+            return 0.0f;
+        }
+
+        // SHRIEK (delay)
+        if (required == Integer.class) {
+            return 0;
         }
 
         // BLOCK / FALLING_DUST
@@ -310,11 +354,12 @@ public class Particles {
             return new ItemStack(Material.LIGHT);
         }
 
-        // 其他（如 VIBRATION 等）暂未兜底，抛出清晰错误，便于你加配置/代码支持
-        throw new IllegalArgumentException(
-                "Particle " + type.name() + " requires " + required.getSimpleName() +
-                        " but got " + (provided == null ? "null" : provided.getClass().getName()) +
-                        ". Please provide proper ParticleData or extend safeData() for this type."
-        );
+        // VIBRATION, TRAIL etc. need a target location, so there is no sensible default: skip and warn once
+        if (WARNED.add(type)) {
+            Bukkit.getLogger().warning("[IP] Particle " + type.name() + " requires " + required.getSimpleName()
+                    + " data, which can't be provided. These particles will not be shown. Pick another particle type.");
+        }
+
+        return UNSUPPORTED;
     }
 }

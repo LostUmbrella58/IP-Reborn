@@ -84,6 +84,11 @@ class Section {
     @Volatile
     private var blockMap: MutableMap<Int, MutableSet<Vector>>? = null
 
+    // Set by clear(). An async generate() that finishes afterwards must not publish its
+    // blocks: nothing would ever send the AIR packets to undo them.
+    @Volatile
+    private var cleared = false
+
     /**
      * Generates the block positions for this section asynchronously. Results are also
      * stashed in [blockMap] so [clear] can send AIR packets later. The returned future
@@ -109,7 +114,13 @@ class Section {
                     }
                 }
 
-                blockMap = currentBlocks
+                synchronized(this) {
+                    if (cleared) {
+                        future.complete(mutableMapOf())
+                        return@execute
+                    }
+                    blockMap = currentBlocks
+                }
                 future.complete(currentBlocks)
             }
             .run()
@@ -136,8 +147,12 @@ class Section {
         builder?.cancel()
         builder = null
 
-        val localBlocks = blockMap ?: return
-        blockMap = null  // drop the reference BEFORE iterating so a tick exception can't pin it
+        val localBlocks = synchronized(this) {
+            cleared = true
+            val map = blockMap
+            blockMap = null  // drop the reference BEFORE iterating so a tick exception can't pin it
+            map
+        } ?: return
 
         val world = World.world
         for ((chunkX, vectors) in localBlocks) {

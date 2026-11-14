@@ -15,6 +15,7 @@ import dev.efnilite.ip.mode.Mode;
 import dev.efnilite.ip.mode.Modes;
 import dev.efnilite.ip.player.ParkourPlayer;
 import dev.efnilite.ip.player.ParkourSpectator;
+import dev.efnilite.ip.reward.Reward;
 import dev.efnilite.ip.reward.Rewards;
 import dev.efnilite.ip.session.Session;
 import dev.efnilite.ip.style.Style;
@@ -204,6 +205,10 @@ public class ParkourGenerator {
      */
     public ParkourGenerator(@NotNull Session session, GeneratorOption... generatorOptions) {
         this(session, Schematics.getSchematic(IP.getPlugin(), "spawn-island"), generatorOptions);
+
+        if (island.schematic == null) {
+            island.markSpawnIslandMissing();
+        }
     }
 
     /**
@@ -368,9 +373,17 @@ public class ParkourGenerator {
             Rewards.INTERVAL_REWARDS.get(interval).forEach(s -> s.execute(player, getMode()));
         }
 
-        if (Rewards.ONE_TIME_REWARDS.containsKey(score) && !player.collectedRewards.contains(Integer.toString(score))) {
-            Rewards.ONE_TIME_REWARDS.get(score).forEach(s -> s.execute(player, getMode()));
-            player.collectedRewards.add(Integer.toString(score));
+        // one-time rewards are tracked per mode, and only marked as collected when one of them applies to this mode
+        List<Reward> oneTime = Rewards.ONE_TIME_REWARDS.get(score);
+        if (oneTime != null) {
+            Mode mode = getMode();
+            String key = Rewards.oneTimeKey(mode.getName(), Modes.DEFAULT.getName(), score);
+            List<Reward> applicable = oneTime.stream().filter(reward -> reward.appliesTo(mode)).toList();
+
+            if (!applicable.isEmpty() && !player.collectedRewards.contains(key)) {
+                applicable.forEach(reward -> reward.execute(player, mode));
+                player.collectedRewards.add(key);
+            }
         }
     }
 
@@ -572,7 +585,7 @@ public class ParkourGenerator {
 
         island.destroy();
 
-        if (getPlayers().isEmpty()) {
+        if (getPlayers().isEmpty() && IP.getPlugin().isEnabled()) {
             getSpectators().forEach(spectator -> Modes.DEFAULT.create(spectator.player));
         }
     }
@@ -584,7 +597,14 @@ public class ParkourGenerator {
             return;
         }
 
-        getPlayers().forEach(player -> leaderboard.put(player.getUUID(), new Score(player.getName(), time, difficulty, score)));
+        // when the last player leaves, they have already been removed from the session before reset(false) runs,
+        // so fall back to this generator's own player to make sure their run is still recorded
+        List<ParkourPlayer> players = getPlayers();
+        if (players.isEmpty()) {
+            players = List.of(player);
+        }
+
+        players.forEach(player -> leaderboard.put(player.getUUID(), new Score(player.getName(), time, difficulty, score)));
     }
 
     private void deleteSchematic() {
@@ -620,27 +640,25 @@ public class ParkourGenerator {
         }
 
         JumpType jump = Probs.random(chances);
+        Schematic schematic = jump == JumpType.SCHEMATIC ? selectSchematic() : null;
+        if (jump == JumpType.SCHEMATIC && schematic == null) {
+            jump = JumpType.DEFAULT; // no schematic available (still loading or none matches the difficulty), use a normal jump
+        }
+
         if (jump == JumpType.SCHEMATIC) {
             IP.log("Generating schematic jump at index %s".formatted(history.size() + 1));
 
-            double difficulty = profile.get("schematicDifficulty").asDouble();
-
-            Schematic schematic = Schematics.getSchematic(IP.getPlugin(),
-                    Colls.random(Schematics.getSchematicNames(IP.getPlugin()).stream()
-                    .filter(name -> name.contains("parkour-") && getDifficulty(name) <= difficulty)
-                    .toList()));
-
             schematicBlocks = rotatedPaste(schematic, selectBlocks().get(0).getLocation());
-
-            particles(schematicBlocks);
-            sound(schematicBlocks);
-
-            new ParkourSchematicGenerateEvent(schematic, this, player).call();
 
             if (schematicBlocks.isEmpty()) {
                 IP.logging().stack("Error while trying to paste schematic %s".formatted(schematic.getFile().getName()), new NoSuchElementException("No schematic blocks found"));
                 return;
             }
+
+            particles(schematicBlocks);
+            sound(schematicBlocks);
+
+            new ParkourSchematicGenerateEvent(schematic, this, player).call();
 
             schematicCooldown = Config.GENERATION.getInt("advanced.schematic-cooldown");
             waitForSchematicCompletion = true;
@@ -668,13 +686,29 @@ public class ParkourGenerator {
             movedBlocks.add(block);
         }
 
+        // track blocks before anything else can throw, so they are always cleaned up
+        history.addAll(movedBlocks);
+        schematicCooldown--;
+
         new ParkourBlockGenerateEvent(movedBlocks, this, player).call();
 
         particles(movedBlocks);
         sound(movedBlocks);
+    }
 
-        history.addAll(movedBlocks);
-        schematicCooldown--;
+    // selects a random parkour schematic the player's difficulty allows, null if there is none (yet)
+    private @Nullable Schematic selectSchematic() {
+        double difficulty = profile.get("schematicDifficulty").asDouble();
+
+        List<String> names = Schematics.getSchematicNames(IP.getPlugin()).stream()
+                .filter(name -> name.contains("parkour-") && getDifficulty(name) <= difficulty)
+                .toList();
+
+        if (names.isEmpty()) {
+            return null;
+        }
+
+        return Schematics.getSchematic(IP.getPlugin(), Colls.random(names));
     }
 
     private @NotNull List<Block> rotatedPaste(Schematic schematic, Location location) {
@@ -809,7 +843,8 @@ public class ParkourGenerator {
      * @return The current detailed duration of the run.
      */
     public String getDetailedTime() {
-        return getTime("mm:ss:SSS");
+        // not formatted with a DateTimeFormatter, since minutes would wrap around after an hour
+        return Score.formatTime(start == null ? 0 : Instant.now().toEpochMilli() - start.toEpochMilli());
     }
 
     private String getTime(String format) {

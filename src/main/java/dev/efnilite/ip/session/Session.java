@@ -10,8 +10,10 @@ import dev.efnilite.ip.world.Divider;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 /**
@@ -40,14 +42,15 @@ public class Session {
     private Visibility visibility = Visibility.PUBLIC;
 
     /**
-     * List of muted users.
+     * List of muted users. Thread-safe, since it is read from the async chat handler.
      */
-    private final List<ParkourUser> muted = new ArrayList<>();
+    private final List<ParkourUser> muted = new CopyOnWriteArrayList<>();
 
     /**
-     * List of users.
+     * Map of users, in join order, so the first player is always the player who has been in the session the longest (the owner).
+     * Thread-safe: every access synchronizes on this map, since it is read from the async chat handler.
      */
-    private final Map<UUID, ParkourUser> users = new HashMap<>();
+    private final Map<UUID, ParkourUser> users = Collections.synchronizedMap(new LinkedHashMap<>());
 
     /**
      * Function that takes the current session and returns whether new players should be accepted.
@@ -165,10 +168,28 @@ public class Session {
      * @return The players.
      */
     public List<ParkourPlayer> getPlayers() {
-        return users.values().stream()
+        return getUsers().stream()
                 .filter(user -> user instanceof ParkourPlayer)
                 .map(user -> (ParkourPlayer) user)
                 .toList();
+    }
+
+    /**
+     * @return The owner of this session: the player who has been in it the longest. Null if there are no players.
+     */
+    @Nullable
+    public ParkourPlayer getOwner() {
+        List<ParkourPlayer> players = getPlayers();
+
+        return players.isEmpty() ? null : players.get(0);
+    }
+
+    /**
+     * @param user The user.
+     * @return True if the user is the owner of this session.
+     */
+    public boolean isOwner(@Nullable ParkourUser user) {
+        return user != null && getOwner() == user;
     }
 
     /**
@@ -209,7 +230,7 @@ public class Session {
      * @return The spectators.
      */
     public List<ParkourSpectator> getSpectators() {
-        return users.values().stream()
+        return getUsers().stream()
                 .filter(user -> user instanceof ParkourSpectator)
                 .map(user -> (ParkourSpectator) user)
                 .toList();
@@ -219,7 +240,9 @@ public class Session {
      * @return The users.
      */
     public List<ParkourUser> getUsers() {
-        return new ArrayList<>(users.values());
+        synchronized (users) {
+            return new ArrayList<>(users.values());
+        }
     }
 
     /**

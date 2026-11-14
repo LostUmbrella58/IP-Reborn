@@ -32,9 +32,24 @@ public final class Registry {
     }
 
     public static void register(@NotNull Style style) {
-        styles.add(style);
-      
+        // replace a style with the same name (e.g. on /ip reload) instead of adding a stale duplicate
+        int existing = indexOfStyle(styles, style.getName());
+        if (existing >= 0) {
+            styles.set(existing, style);
+        } else {
+            styles.add(style);
+        }
+
         IP.log("Registered style %s".formatted(style.getName()));
+    }
+
+    static int indexOfStyle(List<Style> list, String name) {
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).getName().equals(name)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /**

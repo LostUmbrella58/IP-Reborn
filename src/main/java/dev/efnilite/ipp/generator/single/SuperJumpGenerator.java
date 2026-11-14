@@ -31,6 +31,8 @@ public final class SuperJumpGenerator extends PlusGenerator {
     private static final Supplier<Double> DEFAULT_JUMP_DISTANCE = () -> 3.0 + PLATFORM_RADIUS;
     private final List<List<Block>> history = new ArrayList<>();
     private double jumpDistance = DEFAULT_JUMP_DISTANCE.get();
+    // the player's maximum air before joining, restored when this generator is stopped
+    private final int originalMaximumAir;
 
     public SuperJumpGenerator(Session session) {
         // setup settings
@@ -44,6 +46,7 @@ public final class SuperJumpGenerator extends PlusGenerator {
         heightChances.clear();
         heightChances.put(0, 1.0);
 
+        originalMaximumAir = player.player.getMaximumAir();
         player.player.setMaximumAir(100_000_000);
     }
 
@@ -176,6 +179,17 @@ public final class SuperJumpGenerator extends PlusGenerator {
         if (regenerate) {
             jumpDistance = DEFAULT_JUMP_DISTANCE.get();
             updateJumpDistance();
+        } else {
+            // leaving: undo the effectively infinite air
+            player.player.setMaximumAir(originalMaximumAir);
+            if (player.player.getRemainingAir() > originalMaximumAir) {
+                player.player.setRemainingAir(originalMaximumAir);
+            }
+        }
+
+        if (history.isEmpty()) {
+            super.reset(regenerate);
+            return;
         }
 
         // clear history

@@ -66,7 +66,7 @@ object Command : ViCommand() {
             }
             "leaderboards" -> {
                 if (!sender.hasTPermission("iep.leaderboard")) {
-                    LeaderboardMenu.open(sender)
+                    return true
                 }
 
                 LeaderboardMenu.open(sender)

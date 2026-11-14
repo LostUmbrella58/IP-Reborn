@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,7 +37,13 @@ public class Locales {
     /**
      * A map of all locales with their respective yml trees
      */
-    public static final Map<String, FileConfiguration> locales = new HashMap<>();
+    // Concurrent: filled from an async task while the main thread reads it.
+    public static final Map<String, FileConfiguration> locales = new ConcurrentHashMap<>();
+
+    /**
+     * The locale used when a requested locale has no loaded file.
+     */
+    private static final String FALLBACK_LOCALE = "en";
 
     /**
      * Initializes this Locale handler.
@@ -45,7 +52,8 @@ public class Locales {
         Plugin plugin = IP.getPlugin();
 
         Task.create(plugin).async().execute(() -> {
-            locales.clear();
+            // build into a separate map and swap afterwards, so readers never see an empty map mid-reload
+            Map<String, FileConfiguration> loaded = new HashMap<>();
 
             FileConfiguration embedded = YamlConfiguration.loadConfiguration(new InputStreamReader(plugin.getResource("locales/en.yml"), StandardCharsets.UTF_8));
 
@@ -67,6 +75,7 @@ public class Locales {
                 plugin.saveResource("locales/nl.yml", false);
                 plugin.saveResource("locales/fr.yml", false);
                 plugin.saveResource("locales/zh_cn.yml", false);
+                plugin.saveResource("locales/jp.yml", false);
             }
 
             // get all files in locales folder
@@ -82,11 +91,14 @@ public class Locales {
                     FileConfiguration config = YamlConfiguration.loadConfiguration(file);
                     validate(embedded, config, file);
 
-                    locales.put(locale, config);
+                    loaded.put(locale, config);
                 });
             } catch (Exception ex) {
                 IP.logging().stack("Error while trying to read locale files", "restart/reload your server", ex);
             }
+
+            locales.putAll(loaded);
+            locales.keySet().retainAll(loaded.keySet());
         }).run();
     }
 
@@ -154,13 +166,40 @@ public class Locales {
     }
 
     private static <T> T getValue(String locale, Function<FileConfiguration, T> f, T def) {
-        if (locales.isEmpty()) {
-            return def;
-        }
-
-        FileConfiguration config = locales.get(locale);
+        FileConfiguration config = getConfig(locale);
 
         return config != null ? f.apply(config) : def;
+    }
+
+    /**
+     * @param locale The requested locale.
+     * @return The file of this locale, falling back to the configured default locale and then
+     * to English when the requested one has no file. Null when no locales are loaded.
+     */
+    private static FileConfiguration getConfig(String locale) {
+        if (locales.isEmpty()) {
+            return null;
+        }
+
+        FileConfiguration config = locale == null ? null : locales.get(locale);
+        if (config != null) {
+            return config;
+        }
+
+        String defaultLocale = Option.OPTIONS_DEFAULTS == null ? null : Option.OPTIONS_DEFAULTS.get(ParkourOption.LANG);
+        if (defaultLocale != null) {
+            config = locales.get(defaultLocale);
+            if (config != null) {
+                return config;
+            }
+        }
+
+        config = locales.get(FALLBACK_LOCALE);
+        if (config != null) {
+            return config;
+        }
+
+        return locales.values().stream().findFirst().orElse(null);
     }
 
     /**
@@ -193,11 +232,11 @@ public class Locales {
      */
     @NotNull
     public static Item getItem(String locale, String path, String... replace) {
-        if (locales.isEmpty()) { // during reloading
+        FileConfiguration base = getConfig(locale);
+
+        if (base == null) { // during reloading
             return new Item(Material.STONE, "");
         }
-
-        FileConfiguration base = locales.get(locale);
 
         String material = base.getString("%s.material".formatted(path));
         String name = base.getString("%s.name".formatted(path));

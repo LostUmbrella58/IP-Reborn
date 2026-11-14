@@ -23,6 +23,7 @@ import java.util.Comparator;
 public class ParkourSpectator extends ParkourUser {
 
     private final BukkitTask closestChecker;
+    private boolean madeNonCollidable = false;
     /**
      * The closest player.
      */
@@ -39,6 +40,11 @@ public class ParkourSpectator extends ParkourUser {
         Task.create(IP.getPlugin())
             .delay(1)
             .execute(() -> {
+                // the spectator may have left within this tick; don't put them back in spectator mode
+                if (!player.isOnline() || ParkourUser.getUser(player) != this) {
+                    return;
+                }
+
                 teleport(closest.getLocation());
 
                 sendTranslated("play.spectator.join");
@@ -48,13 +54,17 @@ public class ParkourSpectator extends ParkourUser {
                 player.setFlying(true);
                 if (ParkourUser.isBedrockPlayer(player)) {  // bedrock has no spectator mode, so just make the player invisible
                     player.setInvisible(true);
-                    player.setCollidable(false);
+                    if (player.isCollidable()) {
+                        player.setCollidable(false);
+                        madeNonCollidable = true;
+                    }
                 }
             })
             .run();
 
+        // runs on the main thread: it reads player locations and session collections that are
+        // only safe to touch from the server thread
         closestChecker = Task.create(IP.getPlugin())
-            .async()
             .delay(1)
             .repeat(10)
             .execute(() -> {
@@ -108,5 +118,9 @@ public class ParkourSpectator extends ParkourUser {
         closestChecker.cancel();
         session.removeSpectators(this);
         player.setInvisible(false);
+        if (madeNonCollidable) {
+            player.setCollidable(true);
+            madeNonCollidable = false;
+        }
     }
 }

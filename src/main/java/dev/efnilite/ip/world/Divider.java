@@ -6,8 +6,8 @@ import dev.efnilite.ip.session.Session;
 import dev.efnilite.ip.foundation.util.Locations;
 import org.bukkit.Location;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
 /**
@@ -22,7 +22,8 @@ public class Divider {
     /**
      * Map with all session ids map to the session instances.
      */
-    public static final Map<Session, Integer> sections = new HashMap<>();
+    // Concurrent: read from async threads (e.g. AsyncPlayerChatEvent -> ParkourUser#getUser).
+    public static final Map<Session, Integer> sections = new ConcurrentHashMap<>();
 
     /**
      * Associates a session to a specific section.
@@ -50,7 +51,11 @@ public class Divider {
      *
      * @param session The session.
      */
-    public static void remove(Session session) {
+    public static synchronized void remove(Session session) {
+        if (!sections.containsKey(session)) {
+            return;
+        }
+
         IP.log("Removed session at %s".formatted(Locations.toString(toLocation(session), true)));
 
         sections.remove(session);

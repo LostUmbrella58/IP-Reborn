@@ -2,6 +2,8 @@ package dev.efnilite.ip.generator;
 
 import dev.efnilite.ip.IP;
 import dev.efnilite.ip.config.Config;
+import dev.efnilite.ip.player.ParkourPlayer;
+import dev.efnilite.ip.player.ParkourUser;
 import dev.efnilite.ip.session.Session;
 import dev.efnilite.ip.foundation.schematic.Schematic;
 import org.bukkit.Location;
@@ -35,6 +37,12 @@ public final class Island {
      */
     public List<Block> blocks;
 
+    /**
+     * True when this island should use the default spawn island, but it wasn't loaded yet.
+     * Generators that have no spawn island on purpose (e.g. Duels, Lobby) leave this false.
+     */
+    private boolean spawnIslandMissing = false;
+
     public Island(@NotNull Session session, @Nullable Schematic schematic) {
         this.session = session;
         this.schematic = schematic;
@@ -45,6 +53,11 @@ public final class Island {
      */
     public void build(Location location) {
         if (schematic == null) {
+            if (spawnIslandMissing) {
+                // schematics are loaded async on startup, so the spawn island may not be available yet
+                IP.logging().error("Spawn island schematic is not loaded (yet), cancelling join");
+                abortJoin();
+            }
             return;
         }
         IP.log("Building island");
@@ -73,6 +86,23 @@ public final class Island {
                     "check if you used the same material as the one in generation.yml", ex);
 
             blocks.forEach(block -> block.setType(Material.AIR));
+            blocks = null;
+            abortJoin();
+        }
+    }
+
+    /**
+     * Marks that the default spawn island was expected but isn't loaded.
+     */
+    void markSpawnIslandMissing() {
+        spawnIslandMissing = true;
+    }
+
+    // sends the players in this session back, since the session can't be set up
+    private void abortJoin() {
+        for (ParkourPlayer player : session.getPlayers()) {
+            player.send("<red>Parkour could not be started right now. Please try again in a few seconds.");
+            ParkourUser.unregister(player, true, false, false);
         }
     }
 

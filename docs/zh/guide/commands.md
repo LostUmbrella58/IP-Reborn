@@ -19,7 +19,7 @@
 | `/ip reset <everyone/玩家/UUID>` | 永久清除方块跑酷成绩 | `ip.admin` |
 | `/ip forcejoin <everyone/nearest/玩家>` | 强制玩家加入默认模式 | `ip.admin` |
 | `/ip forceleave <everyone/玩家>` | 强制玩家离开跑酷 | `ip.admin` |
-| `/ip recoverinventory <玩家>` | 恢复在线玩家保存的背包 | `ip.admin` |
+| `/ip recoverinventory <玩家>` | 恢复在线且已退出跑酷的玩家保存的背包 | `ip.admin` |
 
 ### 方块跑酷建筑模板
 

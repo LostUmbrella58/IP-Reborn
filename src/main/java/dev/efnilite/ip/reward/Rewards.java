@@ -48,6 +48,24 @@ public class Rewards {
         ONE_TIME_REWARDS = parseScores("one-time-rewards");
     }
 
+    /**
+     * Returns the key under which a collected one-time reward is stored in a player's collected rewards.
+     * The default mode uses the plain score (compatible with older data), other modes are prefixed with their name,
+     * so collecting a reward in one mode doesn't mark the same score as collected in another mode.
+     *
+     * @param modeName        The mode the reward was collected in.
+     * @param defaultModeName The name of the default mode.
+     * @param score           The score.
+     * @return The key.
+     */
+    public static String oneTimeKey(String modeName, String defaultModeName, int score) {
+        if (modeName.equalsIgnoreCase(defaultModeName)) {
+            return Integer.toString(score);
+        }
+
+        return "%s:%d".formatted(modeName.toLowerCase(), score);
+    }
+
     private static Map<Integer, List<Reward>> parseScores(String path) {
         Map<Integer, List<Reward>> rewardMap = new HashMap<>();
 

@@ -20,6 +20,11 @@
 # -= Debugging =-
 debug: false
 
+# -= Update checker =-
+# Whether to check for new versions on startup and log a message when one is available.
+# true = check for updates, false = don't check (keeps the console log clean).
+update-checker: true
+
 # -= Enable joining =-
 # Whether players can join the parkour.
 # When joining is disabled, the IP instance on this server will only read data from leaderboard databases.

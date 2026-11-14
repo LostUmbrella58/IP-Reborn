@@ -122,7 +122,7 @@ internal object MySQLStorage {
 
     fun save(leaderboard: Leaderboard) {
         sql2o.beginTransaction().use {
-            for ((uuid, score) in leaderboard.data) {
+            for ((uuid, score) in leaderboard.snapshot()) {
                 it.createQuery("""
                     INSERT INTO `${prefix}${leaderboard.name}` (uuid, name, score, time, seed) 
                     VALUES (:uuid, :name, :score, :time, :seed)
@@ -146,7 +146,7 @@ internal object MySQLStorage {
                 .executeAndFetch(SqlScore::class.java)
 
             for (score in scores) {
-                leaderboard.data[UUID.fromString(score.uuid)] = Score(score.name!!, score.score!!, score.time!!, score.seed!!)
+                leaderboard.update(UUID.fromString(score.uuid), Score(score.name!!, score.score!!, score.time!!, score.seed!!))
             }
 
             transaction.commit()

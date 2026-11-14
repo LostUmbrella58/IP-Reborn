@@ -3,9 +3,9 @@ package dev.efnilite.ip.foundation.schematic.io;
 import dev.efnilite.ip.foundation.schematic.Schematic;
 import dev.efnilite.ip.foundation.util.Locations;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -22,27 +22,68 @@ import java.util.Map;
 public class SchematicWriter {
 
     /**
-     * Saves blocks to the specified file.
+     * Saves blocks to the specified file. Reads the world, so this must be called on the main thread.
      *
      * @param file The file.
      * @param pos1 The first position.
      * @param pos2 The second position.
      */
     public void save(File file, Location pos1, Location pos2, Plugin plugin) {
+        Snapshot snapshot = snapshot(pos1, pos2);
+
+        if (snapshot == null) {
+            plugin.getLogger().warning("Not saving schematic %s: the selection only contains air".formatted(file.getName()));
+            return;
+        }
+
+        write(file, snapshot, plugin);
+    }
+
+    /**
+     * Reads the blocks between the two positions. Must be called on the main thread.
+     *
+     * @param pos1 The first position.
+     * @param pos2 The second position.
+     * @return The palette and offset data, or null when the selection only contains air.
+     */
+    public @Nullable Snapshot snapshot(Location pos1, Location pos2) {
         List<Block> blocks = getBlocks(Locations.min(pos1, pos2), Locations.max(pos1, pos2));
+
+        if (blocks.isEmpty()) {
+            return null;
+        }
 
         Map<String, Integer> palette = getPalette(blocks);
         Map<String, Integer> offsetData = getOffsetData(blocks, palette);
 
-        // write to file
+        return new Snapshot(palette, offsetData);
+    }
+
+    /**
+     * Writes a snapshot to file. Does not touch the world, so it is safe to call asynchronously.
+     *
+     * @param file     The file.
+     * @param snapshot The snapshot from {@link #snapshot(Location, Location)}.
+     */
+    public void write(File file, Snapshot snapshot, Plugin plugin) {
         try (ObjectOutputStream stream = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
             stream.writeObject(Schematic.VERSION);
-            stream.writeObject(palette);
-            stream.writeObject(offsetData);
+            stream.writeObject(snapshot.palette());
+            stream.writeObject(snapshot.offsets());
             stream.flush();
         } catch (IOException ex) {
-            ex.printStackTrace();
+            plugin.getLogger().severe("Failed to write schematic %s: %s".formatted(file.getName(), ex));
         }
+    }
+
+    /**
+     * The block data read from the world.
+     *
+     * @param palette The palette.
+     * @param offsets The offsets mapped to palette ids.
+     */
+    public record Snapshot(Map<String, Integer> palette, Map<String, Integer> offsets) {
+
     }
 
 
@@ -58,7 +99,7 @@ public class SchematicWriter {
                     location.setY(y);
                     location.setZ(z);
 
-                    if (location.getBlock().getType() == Material.AIR) {
+                    if (location.getBlock().getType().isAir()) {
                         continue;
                     }
 

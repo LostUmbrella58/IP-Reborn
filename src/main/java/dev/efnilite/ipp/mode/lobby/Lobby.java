@@ -5,6 +5,7 @@ import dev.efnilite.ip.generator.ParkourGenerator;
 import dev.efnilite.ip.foundation.util.Numbers;
 import dev.efnilite.ip.foundation.util.Task;
 import dev.efnilite.ip.player.ParkourPlayer;
+import dev.efnilite.ip.player.ParkourUser;
 import dev.efnilite.ip.session.Session;
 import dev.efnilite.ipp.IPP;
 import org.bukkit.Bukkit;
@@ -67,7 +68,9 @@ public class Lobby {
                         LobbySelection readInstance = IP.getGson().fromJson(reader, LobbySelection.class);
                         LobbySelection selection = LobbySelection.from(world, readInstance.pos1, readInstance.pos2); // prevent ghost instances
 
-                        selections.put(world, selection);
+                        if (selection != null) {
+                            selections.put(world, selection);
+                        }
                     } catch (Exception ex) {
                         IPP.logging().stack("Could not read files in lobbies folder", "delete the lobbies folder and restart", ex);
                     }
@@ -126,6 +129,9 @@ public class Lobby {
         Location location = generateSpawn(world, session.generator);
 
         if (location == null) {
+            // no valid lobby area: don't leave the player registered in a session that never started
+            player.send("<red>There is no lobby parkour area set up in this world.");
+            ParkourUser.unregister(player, true, false, false);
             return;
         }
 

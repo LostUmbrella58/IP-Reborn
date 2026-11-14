@@ -164,6 +164,7 @@ reset:
     flying: "Je bent gereset omdat je niet aan het vliegen was."
     bounds: "Je bent gereset omdat je buiten de grenzen ging."
     speed: "Je bent gereset omdat je te langzaam ging."
+    reset: "Je run is gereset."
 
   lines:
     - ""

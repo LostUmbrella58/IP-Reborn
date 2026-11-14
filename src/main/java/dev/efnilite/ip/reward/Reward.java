@@ -9,6 +9,8 @@ import dev.efnilite.ip.player.ParkourPlayer;
 import org.bukkit.Bukkit;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
+
 /**
  * A class for handling reward commands, etc.
  */
@@ -17,27 +19,48 @@ import org.jetbrains.annotations.NotNull;
 public record Reward(@NotNull String string) {
 
     /**
+     * Returns the name of the mode a reward string is meant for.
+     *
+     * @param reward      The reward string.
+     * @param modeNames   The names of all registered modes.
+     * @param defaultMode The name of the default mode, used when the reward has no mode prefix.
+     * @return The lowercase name of the mode this reward is for.
+     */
+    static @NotNull String targetMode(@NotNull String reward, @NotNull Collection<String> modeNames, @NotNull String defaultMode) {
+        return modeNames.stream()
+                .map(String::toLowerCase)
+                .filter(name -> reward.contains("%s:".formatted(name)))
+                .findFirst()
+                .orElse(defaultMode.toLowerCase());
+    }
+
+    /**
+     * @param mode The mode.
+     * @return True if this reward is executed in the given mode.
+     */
+    public boolean appliesTo(@NotNull Mode mode) {
+        return !string.isEmpty() && targetMode(string, Registry.getModes().stream().map(Mode::getName).toList(), Modes.DEFAULT.getName())
+                .equalsIgnoreCase(mode.getName());
+    }
+
+    /**
      * Parses and executes this reward
      *
      * @param player The player to which to give this reward to
+     * @param mode   The mode the player is playing.
+     * @return True if the reward applies to this mode and was executed (or scheduled for leaving).
      */
-    public void execute(@NotNull ParkourPlayer player, @NotNull Mode mode) {
-        if (string.isEmpty()) {
-            return;
+    public boolean execute(@NotNull ParkourPlayer player, @NotNull Mode mode) {
+        if (!appliesTo(mode)) {
+            return false;
         }
 
         String string = this.string;
+        String modePrefix = "%s:".formatted(mode.getName().toLowerCase());
 
-        Mode rewardMode = Registry.getModes().stream()
-                .filter(m -> this.string.contains("%s:".formatted(m.getName().toLowerCase())))
-                .findFirst()
-                .orElse(Modes.DEFAULT);
-
-        if (mode != rewardMode) {
-            return;
+        if (string.contains(modePrefix)) {
+            string = string.replaceFirst(modePrefix, "");
         }
-
-        string = string.replaceFirst("%s:".formatted(rewardMode.getName().toLowerCase()), "");
 
         // check for placeholders
         if (string.toLowerCase().contains("%player%")) {
@@ -47,8 +70,9 @@ public record Reward(@NotNull String string) {
         // check for extra data
         if (string.toLowerCase().contains("leave:")) { // leave:
             string = string.replaceFirst("leave:", "");
-            player.previousData.onLeave.add(new Reward(string));
-            return;
+            // keep the mode prefix, so the reward still applies to this mode when it is executed on leave
+            player.previousData.onLeave.add(new Reward(mode == Modes.DEFAULT ? string : modePrefix + string));
+            return true;
         }
 
         // check for things to perform
@@ -67,5 +91,7 @@ public record Reward(@NotNull String string) {
         } else {
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), string);
         }
+
+        return true;
     }
 }

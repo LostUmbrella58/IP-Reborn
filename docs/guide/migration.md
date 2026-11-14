@@ -2,7 +2,7 @@
 
 Version 6 uses one plugin jar. Do not run old IPPlus or IEP jars beside it.
 
-To upgrade from Infinite Parkour Reborn 6.0.0 to 6.0.1, stop the server, replace the plugin jar, and keep `plugins/IP/`. Use Java 25 or newer when running Paper 26.3. The data locations and legacy migration procedure remain the same.
+To upgrade from Infinite Parkour Reborn 6.0.0 or 6.0.1 to 6.0.2, stop the server, replace the plugin jar, and keep `plugins/IP/`. Use Java 25 or newer when running Paper 26.3. The data locations and legacy migration procedure remain the same.
 
 ## Before upgrading
 
@@ -20,7 +20,7 @@ At startup, files that do not already exist are copied as follows:
 | `plugins/IPPlus/` | `plugins/IP/plus/` |
 | `plugins/IEP/` | `plugins/IP/elytra/` |
 
-The copy does not delete the previous directories and does not overwrite files already present in the destination. This makes an interrupted migration safe to run again.
+The copy does not delete the previous directories and never overwrites files already present in the destination. After an import completes without errors, a `.legacy-import-done` marker is written in the destination folder and the import is not repeated, so files you delete later are not copied back. To import again, delete the marker and restart.
 
 ## Verification checklist
 

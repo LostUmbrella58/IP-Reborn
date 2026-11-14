@@ -230,8 +230,8 @@ public class Option {
 
     private static void initGeneration() {
         TYPE_NORMAL = Config.GENERATION.getInt("generation.type.normal") / 100.0;
-        TYPE_SPECIAL = Config.GENERATION.getInt("generation.type.schematic") / 100.0;
-        TYPE_SCHEMATICS = Config.GENERATION.getInt("generation.type.special") / 100.0;
+        TYPE_SPECIAL = Config.GENERATION.getInt("generation.type.special") / 100.0;
+        TYPE_SCHEMATICS = Config.GENERATION.getInt("generation.type.schematic") / 100.0;
 
         SPECIAL_ICE = Config.GENERATION.getInt("generation.special.ice") / 100.0;
         SPECIAL_SLAB = Config.GENERATION.getInt("generation.special.slab") / 100.0;

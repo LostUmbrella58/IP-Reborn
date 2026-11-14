@@ -195,6 +195,7 @@ reset:
     flying: "You were reset because you weren't flying."
     bounds: "You were reset because you went out of bounds."
     speed: "You were reset for going too slow."
+    reset: "Your run was reset."
 
   lines:
     - ""

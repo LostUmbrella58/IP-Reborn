@@ -2,7 +2,7 @@
 
 版本 6 只使用一个插件 jar。不要让旧 IPPlus 或 IEP jar 与它同时运行。
 
-从 Infinite Parkour Reborn 6.0.0 升级到 6.0.1 时，关闭服务器、替换插件 jar，并保留 `plugins/IP/`。运行 Paper 26.3 需要 Java 25 或更高版本。数据目录与旧插件迁移流程保持不变。
+从 Infinite Parkour Reborn 6.0.0 或 6.0.1 升级到 6.0.2 时，关闭服务器、替换插件 jar，并保留 `plugins/IP/`。运行 Paper 26.3 需要 Java 25 或更高版本。数据目录与旧插件迁移流程保持不变。
 
 ## 升级前
 
@@ -20,7 +20,7 @@
 | `plugins/IPPlus/` | `plugins/IP/plus/` |
 | `plugins/IEP/` | `plugins/IP/elytra/` |
 
-复制过程不会删除原目录，也不会覆盖目标位置已有的文件；即使启动中断，也可以再次安全执行。
+复制过程不会删除原目录，也不会覆盖目标位置已有的文件。导入成功后，会在目标目录写入 `.legacy-import-done` 标记，之后不再重复导入，所以之后删掉的文件不会被再复制回来。如需重新导入，删除该标记后重启。
 
 ## 检查清单
 

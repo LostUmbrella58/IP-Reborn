@@ -21,6 +21,7 @@ Stop the server and back up the affected file before a large edit. `/ip reload` 
 
 Important sections in `plugins/IP/config.yml`:
 
+- `update-checker`: check Spigot for a newer release on startup and log a notice only when one exists. Set it to `false` to skip the check.
 - `joining`: allow players to enter parkour. Disable it on a leaderboard-only server.
 - `bungeecord`: automatic join, return server, and non-proxy return location.
 - `sql`: enable MySQL and configure host, port, credentials, database, and table prefix.

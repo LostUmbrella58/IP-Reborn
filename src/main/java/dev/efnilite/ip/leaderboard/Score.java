@@ -23,16 +23,37 @@ public record Score(String name, String time, String difficulty, int score) {
     }
 
     /**
-     * @return This score's time in millis.
+     * Formats a duration in the detailed {@code mm:ss:SSS} format used for stored scores.
+     * Minutes are not capped at 59, so runs longer than an hour don't wrap around (e.g. {@code 65:00:000}).
+     *
+     * @param millis The duration in milliseconds.
+     * @return The formatted time.
+     */
+    public static String formatTime(long millis) {
+        millis = Math.max(0, millis);
+
+        long minutes = millis / 60_000;
+        long seconds = (millis / 1000) % 60;
+        long ms = millis % 1000;
+
+        return "%02d:%02d:%03d".formatted(minutes, seconds, ms);
+    }
+
+    /**
+     * @return This score's time in millis. {@link Integer#MAX_VALUE} if the time can't be parsed.
      */
     public int getTimeMillis() {
-        String[] split = time.split(":");
+        try {
+            String[] split = time.split(":");
 
-        int m = Integer.parseInt(split[0]);
-        int s = Integer.parseInt(split[1]);
-        int ms = Integer.parseInt(split[2]);
+            int m = Integer.parseInt(split[0]);
+            int s = Integer.parseInt(split[1]);
+            int ms = Integer.parseInt(split[2]);
 
-        return m * 60 * 1000 + s * 1000 + ms;
+            return m * 60 * 1000 + s * 1000 + ms;
+        } catch (RuntimeException ex) { // malformed or placeholder ("?") time
+            return Integer.MAX_VALUE;
+        }
     }
 
     @Override

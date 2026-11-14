@@ -60,8 +60,12 @@ public class InviteMenu {
 
             items.add(item.click(event -> {
                 if (Cooldowns.canPerform(player, "multiplayer invite", 2500)) {
+                    // some modes (e.g. lobby) have no menu item
+                    Item modeItem = session.generator.getMode().getItem(Option.OPTIONS_DEFAULTS.get(ParkourOption.LANG));
+                    String modeName = modeItem != null ? ChatColor.stripColor(modeItem.getName()) : session.generator.getMode().getName();
+
                     for (String s : PlusLocales.getString(other, "invite.message", false).formatted(player.getName(),
-                            ChatColor.stripColor(session.generator.getMode().getItem(Option.OPTIONS_DEFAULTS.get(ParkourOption.LANG)).getName()),
+                            modeName,
                             player.getName()).split("\\|\\|")) {
                         if (classExists()) {
                             new AdventureInviteSender(other, player, s);

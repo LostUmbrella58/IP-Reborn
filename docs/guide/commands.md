@@ -19,7 +19,7 @@ Arguments in `<angle brackets>` are required. Arguments in `[square brackets]` a
 | `/ip reset <everyone/player/uuid>` | Permanently reset block-parkour scores | `ip.admin` |
 | `/ip forcejoin <everyone/nearest/player>` | Force players into the default mode | `ip.admin` |
 | `/ip forceleave <everyone/player>` | Force players out of parkour | `ip.admin` |
-| `/ip recoverinventory <player>` | Restore an online player's saved inventory | `ip.admin` |
+| `/ip recoverinventory <player>` | Restore the saved inventory of an online player who is not in parkour | `ip.admin` |
 
 ### Block-parkour schematics
 

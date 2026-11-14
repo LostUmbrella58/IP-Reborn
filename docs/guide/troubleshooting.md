@@ -29,7 +29,9 @@ Keep the affected player online and run:
 /ip recoverinventory <player>
 ```
 
-The command requires `ip.admin`. Do not repeatedly join and leave before recovery, because newer saved state may replace the data you need. Preserve `plugins/IP/inventories/` while investigating.
+The command requires `ip.admin`, and the player must have left parkour first. After the items are given back, the backup is deleted so it can't be restored twice. Do not repeatedly join and leave before recovery, because newer saved state may replace the data you need. Preserve `plugins/IP/inventories/` while investigating.
+
+Elytra parkour keeps its own backup in `plugins/IP/elytra/restore/<uuid>.yml`. It is restored automatically the next time the player logs in, so no command is needed.
 
 ## A migrated file is missing
 
@@ -39,6 +41,12 @@ The migration only copies a file when the destination does not already exist. Co
 - `plugins/IEP/` with `plugins/IP/elytra/`
 
 Stop the server before manually copying anything and keep both backups.
+
+The import runs until it has completed once. To run it again, delete `.legacy-import-done` from `plugins/IP/plus/` or `plugins/IP/elytra/` and restart.
+
+## A leaderboard or player file is unreadable
+
+A file that can't be read is copied next to the original as `<name>.corrupt-<timestamp>` and a warning is logged, so its data isn't lost. Stop the server, repair the file or restore it from that copy, then start again.
 
 ## Reporting a bug
 

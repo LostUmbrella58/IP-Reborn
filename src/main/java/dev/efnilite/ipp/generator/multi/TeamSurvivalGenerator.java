@@ -34,7 +34,15 @@ public final class TeamSurvivalGenerator extends MultiplayerGenerator {
 
     @Override
     public void tick() {
-        if (stopped || session == null || getPlayers().isEmpty()) {
+        if (stopped) {
+            // super.tick() is never reached when stopped, so cancel here to avoid leaking the repeating task
+            if (task != null) {
+                task.cancel();
+            }
+            return;
+        }
+
+        if (session == null || getPlayers().isEmpty()) {
             return;
         }
 

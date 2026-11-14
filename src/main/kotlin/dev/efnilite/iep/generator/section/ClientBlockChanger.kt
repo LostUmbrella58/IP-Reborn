@@ -29,17 +29,7 @@ class ClientBlockChanger {
     private val toChange: MutableMap<Int, MutableSet<Vector>> = mutableMapOf()
 
     fun check(player: Player, style: Style) {
-        val playerCx = player.location.chunk.x
-
-        // clientViewDistance returns -1 if Paper hasn't yet received the client's VD
-        // packet (common in the first second after a fresh join). Fall back to the
-        // server's per-world value so forwardLimit doesn't collapse to "behind player".
-        val rawVd = player.clientViewDistance
-        val vd = if (rawVd > 0) rawVd else max(4, player.world.viewDistance)
-        // Render up to ~min(vd, 8) chunks ahead. Tight on min so we don't burn packets
-        // far past where the player can see; generous enough that boost-time velocity
-        // doesn't outrun the render window.
-        val forwardLimit = playerCx + min(vd, 8)
+        val forwardLimit = forwardLimit(player)
 
         val toSend = mutableListOf<Pair<Int, Set<Vector>>>()
         synchronized(this) {
@@ -58,9 +48,23 @@ class ClientBlockChanger {
     }
 
     fun queue(new: Map<Int, Set<Vector>>) {
-        IEP.log("Queued chunks ${new.keys.toTypedArray().contentToString()}")
+        queueIf(new) { true }
+    }
 
+    /**
+     * Queues [new] only if [condition] holds. The condition is evaluated under the same lock
+     * as [clear], so a reset that bumps its generation counter before calling [clear] can
+     * never be undone by a late async completion.
+     */
+    fun queueIf(new: Map<Int, Set<Vector>>, condition: () -> Boolean) {
         synchronized(this) {
+            if (!condition()) {
+                IEP.log("Dropped stale chunks ${new.keys.toTypedArray().contentToString()}")
+                return
+            }
+
+            IEP.log("Queued chunks ${new.keys.toTypedArray().contentToString()}")
+
             new.forEach { (x, vectors) ->
                 toChange.getOrPut(x) { mutableSetOf() }.addAll(vectors)
             }
@@ -108,6 +112,26 @@ class ClientBlockChanger {
             states += state
         }
         player.sendBlockChanges(states)
+    }
+
+    companion object {
+
+        /**
+         * @return The furthest chunk X (inclusive) that should be rendered for [player].
+         */
+        fun forwardLimit(player: Player): Int {
+            val playerCx = player.location.blockX shr 4
+
+            // clientViewDistance returns -1 if Paper hasn't yet received the client's VD
+            // packet (common in the first second after a fresh join). Fall back to the
+            // server's per-world value so forwardLimit doesn't collapse to "behind player".
+            val rawVd = player.clientViewDistance
+            val vd = if (rawVd > 0) rawVd else max(4, player.world.viewDistance)
+            // Render up to ~min(vd, 8) chunks ahead. Tight on min so we don't burn packets
+            // far past where the player can see; generous enough that boost-time velocity
+            // doesn't outrun the render window.
+            return playerCx + min(vd, 8)
+        }
     }
 
     /**
